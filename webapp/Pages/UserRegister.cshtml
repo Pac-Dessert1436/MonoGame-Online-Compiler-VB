@@ -1,0 +1,60 @@
+@page
+@model webapp.Pages.UserRegisterModel
+@{
+    ViewData["Title"] = "Register - MonoGame Online Compiler VB";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Register</h4>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @Model.ErrorMessage
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+                    {
+                        <div class="alert alert-success" role="alert">
+                            @Model.SuccessMessage
+                        </div>
+                    }
+
+                    <form method="post">
+                        <div class="mb-3">
+                            <label for="Username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="Username" name="Username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="Email" name="Email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="Password" name="Password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ConfirmPassword" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" id="ConfirmPassword" name="ConfirmPassword" required>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" asp-page-handler="Register" class="btn btn-success">Register</button>
+                        </div>
+                    </form>
+
+                    <hr>
+                    <div class="text-center">
+                        <p>Already have an account? <a asp-page="/UserLogin">Login here</a></p>
+                        <p><a asp-page="/Index">Back to Home</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

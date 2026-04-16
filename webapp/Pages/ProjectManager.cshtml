@@ -1,0 +1,151 @@
+@page
+@model webapp.Pages.ProjectManagerModel
+@{
+    ViewData["Title"] = "Project Manager - MonoGame Online Compiler VB";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>My Projects</h2>
+                <div>
+                    <span class="badge bg-primary">Welcome, @Model.Username!</span>
+                    <a asp-page="/UserLogin" class="btn btn-outline-danger btn-sm ms-2">Logout</a>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    @Model.ErrorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+            {
+                <div class="alert alert-success" role="alert">
+                    @Model.SuccessMessage
+                </div>
+            }
+
+            <!-- Create New Project Button -->
+            <div class="mb-4">
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                    <i class="bi bi-plus-circle"></i> Create New Project
+                </button>
+            </div>
+
+            <!-- Projects List -->
+            @if (Model.Projects != null && Model.Projects.Any())
+            {
+                <div class="row">
+                    @foreach (var project in Model.Projects)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">@project.Name</h5>
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            Created: @project.CreatedAt.ToString("yyyy-MM-dd HH:mm")<br>
+                                            @if (project.UpdatedAt.HasValue)
+                                            {
+                                                <text>Updated: @project.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm")</text>
+                                            }
+                                        </small>
+                                    </p>
+                                    <p class="card-text">
+                                        <small class="text-info">
+                                            @project.Assets.Count assets
+                                        </small>
+                                    </p>
+                                </div>
+                                <div class="card-footer bg-white border-top-0">
+                                    <div class="d-flex gap-2">
+                                        <a asp-page="/VbCodeEditor" asp-route-projectId="@project.Id" 
+                                           class="btn btn-primary btn-sm flex-grow-1">
+                                            <i class="bi bi-code"></i> Edit Code
+                                        </a>
+                                        <button type="button" class="btn btn-danger btn-sm" 
+                                                onclick="confirmDelete(@project.Id, '@project.Name')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info" role="alert">
+                    <h4 class="alert-heading">No projects yet!</h4>
+                    <p>Get started by creating your first MonoGame project.</p>
+                    <hr>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                        Create Your First Project
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Project Modal -->
+<div class="modal fade" id="createProjectModal" tabindex="-1" aria-labelledby="createProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createProjectModalLabel">Create New Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" asp-page-handler="CreateProject">
+                    <div class="mb-3">
+                        <label for="ProjectName" class="form-label">Project Name</label>
+                        <input type="text" class="form-control" id="ProjectName" name="ProjectName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="InitialCode" class="form-label">Initial Code (Optional)</label>
+                        <textarea class="form-control" id="InitialCode" name="InitialCode" rows="10">@webapp.Pages.ProjectManagerModel.ScaffoldCode</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Project</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteProjectModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the project "<span id="deleteProjectName"></span>"?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+                <form method="post" asp-page-handler="DeleteProject" id="deleteProjectForm">
+                    <input type="hidden" id="DeleteProjectId" name="DeleteProjectId">
+                    <button type="submit" class="btn btn-danger">Delete Project</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function confirmDelete(projectId, projectName) {
+            document.getElementById('deleteProjectName').textContent = projectName;
+            document.getElementById('DeleteProjectId').value = projectId;
+            var modal = new bootstrap.Modal(document.getElementById('deleteProjectModal'));
+            modal.show();
+        }
+    </script>
+}

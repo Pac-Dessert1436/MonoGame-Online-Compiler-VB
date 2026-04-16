@@ -1,0 +1,52 @@
+@page
+@model webapp.Pages.UserLoginModel
+@{
+    ViewData["Title"] = "Login - MonoGame Online Compiler VB";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Login</h4>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @Model.ErrorMessage
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+                    {
+                        <div class="alert alert-success" role="alert">
+                            @Model.SuccessMessage
+                        </div>
+                    }
+
+                    <form method="post">
+                        <div class="mb-3">
+                            <label for="Email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="Email" name="Email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="Password" name="Password" required>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" asp-page-handler="Login" class="btn btn-primary">Login</button>
+                        </div>
+                    </form>
+
+                    <hr>
+                    <div class="text-center">
+                        <p>Don't have an account? <a asp-page="/UserRegister">Register here</a></p>
+                        <p><a asp-page="/Index">Back to Home</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

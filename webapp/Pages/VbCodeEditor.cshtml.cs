@@ -9,19 +9,27 @@ public class VbCodeEditorModel : PageModel
     public string VbCode { get; set; } = string.Empty;
 
     [BindProperty]
-    public string SessionId { get; set; } = string.Empty;
+    public int ProjectId { get; set; }
+
+    [BindProperty]
+    public string ProjectName { get; set; } = string.Empty;
 
     [BindProperty]
     public List<IFormFile>? AssetFiles { get; set; }
 
     public string? CompilationError { get; set; }
     public string? GameUrl { get; set; }
+    public int UserId { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public bool IsAuthenticated { get; set; }
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<VbCodeEditorModel> _logger;
 
-    public VbCodeEditorModel(IHttpClientFactory httpClientFactory)
+    public VbCodeEditorModel(IHttpClientFactory httpClientFactory, ILogger<VbCodeEditorModel> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _logger = logger;
     }
 
     internal const string ScaffoldCode = @"Imports Microsoft.Xna.Framework
@@ -124,33 +132,83 @@ Public Class GameMain
     End Sub
 End Class";
 
-    public void OnGet()
+    public async Task<IActionResult> OnGetAsync(int? projectId)
     {
-        // Load scaffold code if no code provided
-        if (string.IsNullOrEmpty(VbCode))
+        var userId = HttpContext.Session.GetInt32("UserId");
+        if (!userId.HasValue)
         {
-            VbCode = ScaffoldCode;
+            return RedirectToPage("/UserLogin");
         }
 
-        // Generate new session ID if not provided
-        if (string.IsNullOrEmpty(SessionId))
+        UserId = userId.Value;
+        Username = HttpContext.Session.GetString("Username") ?? "User";
+        IsAuthenticated = true;
+
+        if (projectId.HasValue)
         {
-            SessionId = Guid.NewGuid().ToString();
+            ProjectId = projectId.Value;
+            await LoadProjectAsync();
+        }
+        else
+        {
+            VbCode = ScaffoldCode;
+            ProjectName = "New Project";
+        }
+
+        return Page();
+    }
+
+    private async Task LoadProjectAsync()
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var response = await httpClient.GetAsync($"api/project/{ProjectId}?userId={UserId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var project = await response.Content.ReadFromJsonAsync<GameProject>();
+                if (project != null)
+                {
+                    VbCode = project.VbCode;
+                    ProjectName = project.Name;
+                }
+            }
+            else
+            {
+                _logger.LogError("Failed to load project {ProjectId} for user {UserId}", ProjectId, UserId);
+                VbCode = ScaffoldCode;
+                ProjectName = "Error Loading Project";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading project");
+            VbCode = ScaffoldCode;
+            ProjectName = "Error Loading Project";
         }
     }
 
     public async Task<IActionResult> OnPostCompileAsync()
     {
+        _logger.LogInformation("OnPostCompileAsync called. VbCode length: {Length}", VbCode?.Length ?? 0);
+
         if (string.IsNullOrWhiteSpace(VbCode))
         {
+            _logger.LogWarning("VbCode is empty or whitespace");
             ModelState.AddModelError("VbCode", "VB.NET code is required");
             return Page();
         }
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.PostAsJsonAsync("/api/monogame/compile", new { VbCode, SessionId });
+            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            
+            // Update project with current code
+            await UpdateProjectAsync();
+
+            // Compile the project
+            var response = await httpClient.PostAsJsonAsync("api/monogame/compile", new { ProjectId, UserId });
             
             if (response.IsSuccessStatusCode)
             {
@@ -173,27 +231,54 @@ End Class";
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error during compilation");
             CompilationError = $"Error during compilation: {ex.Message}";
         }
 
         return Page();
     }
 
+    private async Task UpdateProjectAsync()
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            await httpClient.PutAsJsonAsync($"api/project/{ProjectId}", new 
+            { 
+                UserId = UserId, 
+                Name = ProjectName, 
+                VbCode = VbCode 
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update project {ProjectId}", ProjectId);
+        }
+    }
+
     public async Task<IActionResult> OnPostCompileWithAssetsAsync()
     {
+        _logger.LogInformation("OnPostCompileWithAssetsAsync called. VbCode length: {Length}", VbCode?.Length ?? 0);
+
         if (string.IsNullOrWhiteSpace(VbCode))
         {
+            _logger.LogWarning("VbCode is empty or whitespace in CompileWithAssets");
             ModelState.AddModelError("VbCode", "VB.NET code is required");
             return Page();
         }
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
+            var httpClient = _httpClientFactory.CreateClient("LocalClient");
             
+            // Update project with current code
+            await UpdateProjectAsync();
+
+            // Compile with new assets
             using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(VbCode), "VbCode");
-            content.Add(new StringContent(SessionId), "SessionId");
+            content.Add(new StringContent(ProjectId.ToString()), "ProjectId");
+            content.Add(new StringContent(UserId.ToString()), "UserId");
+            content.Add(new StringContent(VbCode), "VbCode"); // Add VbCode explicitly
             
             if (AssetFiles != null)
             {
@@ -203,7 +288,7 @@ End Class";
                 }
             }
 
-            var response = await httpClient.PostAsync("/api/monogame/compile-with-assets", content);
+            var response = await httpClient.PostAsync("api/monogame/compile-with-new-assets", content);
             
             if (response.IsSuccessStatusCode)
             {

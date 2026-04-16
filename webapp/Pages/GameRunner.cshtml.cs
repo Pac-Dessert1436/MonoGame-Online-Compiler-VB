@@ -31,8 +31,8 @@ public class GameRunnerModel : PageModel
         // Check game status
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.GetAsync($"/api/monogame/status/{gameId}");
+            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var response = await httpClient.GetAsync($"api/monogame/status/{gameId}");
             
             if (response.IsSuccessStatusCode)
             {

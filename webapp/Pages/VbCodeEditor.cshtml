@@ -15,7 +15,7 @@
                 </div>
                 <div class="card-body">
                     <form method="post" asp-page-handler="Compile">
-                        <input type="hidden" asp-for="SessionId" />
+                        <input type="hidden" asp-for="ProjectId" />
 
                         <div class="mb-3">
                             <label for="vbCode" class="form-label">GameMain.vb</label>
@@ -32,7 +32,7 @@
                         }
 
                         <div class="d-flex gap-2">
-                            <button type="submit" name="handler" value="Compile" class="btn btn-primary">
+                            <button type="submit" name="handler" value="Compile" class="btn btn-primary" onclick="return validateAndSubmit()">
                                 <i class="bi bi-play-fill"></i> Run Game
                             </button>
                             <button type="button" class="btn btn-secondary" onclick="resetCode()">
@@ -52,7 +52,7 @@
                 </div>
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data" asp-page-handler="CompileWithAssets">
-                        <input type="hidden" asp-for="SessionId" />
+                        <input type="hidden" asp-for="ProjectId" />
                         <input type="hidden" asp-for="VbCode" id="hiddenVbCode" />
 
                         <div class="mb-3">
@@ -127,7 +127,7 @@
         
         require(['vs/editor/editor.main'], function() {
             editor = monaco.editor.create(document.getElementById('monacoEditor'), {
-                value: `@Html.Raw(Model.VbCode.Replace("\r\n", "\n").Replace("\n", "\\n").Replace("\"", "\\\""))`,
+                value: `@Html.Raw(Model.VbCode.Replace("\r\n", "\n").Replace("\n", "\\n").Replace("\"", "\\\"").Replace("'", "\\'"))`,
                 language: 'vb',
                 theme: 'hc-black',
                 automaticLayout: true,
@@ -143,7 +143,12 @@
             });
 
             editor.onDidChangeModelContent(function() {
-                document.getElementById('vbCodeHidden').value = editor.getValue();
+                const codeValue = editor.getValue();
+                document.getElementById('vbCodeHidden').value = codeValue;
+                const hiddenVbCode = document.getElementById('hiddenVbCode');
+                if (hiddenVbCode) {
+                    hiddenVbCode.value = codeValue;
+                }
             });
         });
 
@@ -157,8 +162,22 @@
             }
         }
 
-        document.querySelector('form[enctype="multipart/form-data"]').addEventListener('submit', function () {
-            document.getElementById('hiddenVbCode').value = editor.getValue();
+        function validateAndSubmit() {
+            const codeValue = editor.getValue();
+            if (!codeValue || codeValue.trim() === '') {
+                alert('Please enter some VB.NET code before compiling.');
+                return false;
+            }
+            console.log('Submitting code with length:', codeValue.length);
+            return true;
+        }
+
+        document.querySelector('form[enctype="multipart/form-data"]').addEventListener('submit', function (e) {
+            const codeValue = editor.getValue();
+            const hiddenVbCode = document.getElementById('hiddenVbCode');
+            if (hiddenVbCode) {
+                hiddenVbCode.value = codeValue;
+            }
         });
 
         document.getElementById('assetFiles').addEventListener('change', function () {

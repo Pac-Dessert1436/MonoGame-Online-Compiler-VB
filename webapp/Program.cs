@@ -1,12 +1,34 @@
 using webapp.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddControllers();
-builder.Services.AddHttpClient();
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// Configure database
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=monogame_compiler.db"));
+
+// Configure HTTP client with base address and extended timeout
+builder.Services.AddHttpClient("LocalClient", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5033");
+    client.Timeout = TimeSpan.FromMinutes(5); // 5 minutes timeout for compilation
+});
+
+// Register services
 builder.Services.AddScoped<MonoGameCompilerService>();
+builder.Services.AddScoped<EnhancedMonoGameCompilerService>();
+builder.Services.AddScoped<UserService>();
 
 // Configure CORS for development
 builder.Services.AddCors(options =>
@@ -30,6 +52,8 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseSession();
 
 app.UseRouting();
 
@@ -58,5 +82,12 @@ app.MapRazorPages()
    .WithStaticAssets();
 
 app.MapControllers();
+
+// Initialize database
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    context.Database.EnsureCreated();
+}
 
 app.Run();

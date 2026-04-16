@@ -1,0 +1,172 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "MonoGame VB.NET Compiler";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="text-center mb-5">
+                <h1 class="display-4 mb-3">MonoGame VB.NET Compiler</h1>
+                <p class="lead">Write and run VB.NET MonoGame games directly in your browser</p>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Welcome to the Browser-Based MonoGame Development Environment</h5>
+                    <p class="card-text">
+                        This platform allows you to write VB.NET code for MonoGame projects and compile them to WebAssembly,
+                        enabling you to run your games directly in modern web browsers without any local setup.
+                    </p>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-book text-info"></i> Tutorial
+                            </h5>
+                            <p class="card-text">
+                                Learn MonoGame development in VB.NET. Perfect for developers coming from vbPixelGameEngine.
+                            </p>
+                            <a asp-page="/Tutorial" class="btn btn-info">
+                                View Tutorial <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-code-slash text-primary"></i> Code Editor
+                            </h5>
+                            <p class="card-text">
+                                Write your VB.NET game code in our built-in editor with syntax highlighting.
+                                Edit <code>GameMain.vb</code> while <code>Program.vb</code> is managed by the backend.
+                            </p>
+                            <a asp-page="/VbCodeEditor" class="btn btn-primary">
+                                Start Coding <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-gear text-success"></i> Asset Management
+                            </h5>
+                            <p class="card-text">
+                                Upload your game assets (images, sounds, music) and build them using
+                                MonoGame Content Builder (MGCB) directly in the browser.
+                            </p>
+                            <a asp-page="/VbCodeEditor" class="btn btn-success">
+                                Manage Assets <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">How It Works</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="display-6 mb-2">1</div>
+                            <h6>Write Code</h6>
+                            <p class="small text-muted">Edit VB.NET code in our browser-based editor</p>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="display-6 mb-2">2</div>
+                            <h6>Upload Assets</h6>
+                            <p class="small text-muted">Add images, sounds, and other game resources</p>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="display-6 mb-2">3</div>
+                            <h6>Compile</h6>
+                            <p class="small text-muted">Backend compiles to WebAssembly (~30-40s)</p>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="display-6 mb-2">4</div>
+                            <h6>Play</h6>
+                            <p class="small text-muted">Run your game directly in the browser</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Features</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <strong>VB.NET Support:</strong> Full Visual Basic .NET language support with syntax highlighting
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <strong>MonoGame Framework:</strong> Complete MonoGame 3.8 framework for game development
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <strong>WebAssembly:</strong> Compile to WASM for high-performance browser execution
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <strong>Asset Pipeline:</strong> Built-in MGCB for content processing
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <strong>Real-time Compilation:</strong> See compilation errors instantly in the browser
+                        </li>
+                        <li class="list-group-item">
+                            <i class="bi bi-info-circle-fill text-info me-2"></i>
+                            <strong>Note:</strong> Syntax errors are not checked due to lack of Roslyn analyzer
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Getting Started</h5>
+                    <ol class="card-text">
+                        <li>Click "Start Coding" to open the code editor</li>
+                        <li>The editor will load with scaffold code to get you started</li>
+                        <li>Modify the <code>GameMain.vb</code> code to implement your game logic</li>
+                        <li>Upload any game assets (images, sounds) using the asset manager</li>
+                        <li>Click "Run Game" to compile and launch your game</li>
+                        <li>Wait for compilation (approximately 30-40 seconds)</li>
+                        <li>Your game will run in the browser when ready</li>
+                    </ol>
+                    <a asp-page="/VbCodeEditor" class="btn btn-lg btn-primary">
+                        <i class="bi bi-play-fill"></i> Start Coding Now
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <h5 class="alert-heading">
+                    <i class="bi bi-info-circle-fill"></i> Technical Information
+                </h5>
+                <hr>
+                <p class="mb-0">
+                    This platform uses ASP.NET Core backend with .NET 8.0 WebAssembly runtime. 
+                    Your VB.NET code is compiled to WebAssembly using the MonoGame framework, 
+                    enabling high-performance 2D game development that runs natively in modern browsers.
+                    The <code>Program.vb</code> file is managed by the backend to ensure proper 
+                    WebAssembly initialization, while you have full control over <code>GameMain.vb</code>.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

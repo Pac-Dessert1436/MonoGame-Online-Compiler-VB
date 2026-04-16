@@ -1,0 +1,933 @@
+@page
+@model TutorialModel
+@{
+    ViewData["Title"] = "MonoGame Tutorial for VB.NET Developers";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">🎮 MonoGame Tutorial for VB.NET Developers</h2>
+                    <small class="text-white-50">From vbPixelGameEngine to MonoGame</small>
+                </div>
+                <div class="card-body">
+                    <p class="lead">
+                        Welcome! This tutorial is designed for VB.NET developers who are familiar with
+                        <strong>vbPixelGameEngine</strong> (with APIs like Vi2d, Vf2d, Sprite, DrawString,
+                        DrawRect etc) and want to transition to <strong>MonoGame</strong>.
+                    </p>
+                    <div class="alert alert-info">
+                        <strong>💡 Good News:</strong> MonoGame supports VB.NET! While most MonoGame examples are in C#,
+                        the concepts are identical, and the syntax differences are minimal.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav class="nav nav-pills flex-column flex-sm-row">
+                <a class="nav-link active" href="#overview">Overview</a>
+                <a class="nav-link" href="#differences">Key Differences</a>
+                <a class="nav-link" href="#vectors">Vector Types</a>
+                <a class="nav-link" href="#drawing">Drawing Methods</a>
+                <a class="nav-link" href="#sprites">Sprites</a>
+                <a class="nav-link" href="#game-loop">Game Loop</a>
+                <a class="nav-link" href="#examples">Code Examples</a>
+                <a class="nav-link" href="#tips">Pro Tips</a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div id="overview" class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📚 What is MonoGame?</h3>
+                </div>
+                <div class="card-body">
+                    <p>
+                        <strong>MonoGame</strong> is a cross-platform framework for building games with .NET.
+                        It's the framework behind popular games like <em>Stardew Valley</em>, <em>Celeste</em>,
+                        and <em>Bastion</em>.
+                    </p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>vbPixelGameEngine</h5>
+                            <ul>
+                                <li>Simple, beginner-friendly</li>
+                                <li>2D-focused</li>
+                                <li>Immediate mode rendering</li>
+                                <li>Vi2d, Vf2d structs</li>
+                                <li>Sprite class</li>
+                                <li>DrawString, DrawRect methods</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>MonoGame</h5>
+                            <ul>
+                                <li>Professional-grade framework</li>
+                                <li>2D and 3D support</li>
+                                <li>Retained mode rendering</li>
+                                <li>Vector2, Vector3, Vector4 structs</li>
+                                <li>Texture2D class</li>
+                                <li>SpriteBatch.DrawString, Draw methods</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success mt-3">
+                        <strong>✅ Key Advantage:</strong> MonoGame gives you access to professional game development
+                        tools while maintaining the simplicity you love from vbPixelGameEngine!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Differences Section -->
+    <div id="differences" class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔄 Key Differences</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Concept</th>
+                                <th>vbPixelGameEngine</th>
+                                <th>MonoGame</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Framework Type</strong></td>
+                                <td>Immediate mode</td>
+                                <td>Retained mode</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Coordinate System</strong></td>
+                                <td>Top-left origin (0,0)</td>
+                                <td>Top-left origin (0,0)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Vector Types</strong></td>
+                                <td>Vi2d (int), Vf2d (float)</td>
+                                <td>Point (int), Vector2 (float)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Sprites</strong></td>
+                                <td>Sprite class</td>
+                                <td>Texture2D class</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Drawing</strong></td>
+                                <td>Direct Draw calls</td>
+                                <td>SpriteBatch.Begin/End pattern</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Colors</strong></td>
+                                <td>Pixel struct *</td>
+                                <td>Color struct</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Input</strong></td>
+                                <td>GetKey, GetMouse</td>
+                                <td>KeyboardState, MouseState</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Game Loop</strong></td>
+                                <td>OnUserUpdate</td>
+                                <td>Update + Draw methods</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p>* Note: The <code>Pixel</code> struct in vbPixelGameEngine can be implicitly converted from
+                        the <code>Presets</code> enum, whereas MonoGame's <code>Color</code> struct contains
+                        a wider range of preset colors available for your custom use.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vector Types Section -->
+    <div id="vectors" class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📐 Vector Types</h3>
+                </div>
+                <div class="card-body">
+                    <p>
+                        In vbPixelGameEngine, you use <code>Vi2d</code> for integer vectors and <code>Vf2d</code> for
+                        float vectors.
+                        In MonoGame, almost everything uses <code>Vector2</code> (float-based), though you can also use
+                        <code>Point</code> for integer coordinates.
+                    </p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>vbPixelGameEngine</h5>
+                            <pre><code class="language-vb">' Integer vector
+Dim pos As New Vi2d(100, 50)
+' Float vector
+Dim velocity As New Vf2d(2.5F, 1.0F)
+
+' Vector operations
+pos.x += 1
+pos.y += velocity.y
+
+' Built-in vector math
+pos += velocity
+Dim distance As Single = (pos1 - pos2).Mag()
+</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>MonoGame</h5>
+                            <pre><code class="language-vb">' Vector2 (always float)
+Dim pos As New Vector2(100.0F, 50.0F)
+Dim velocity As New Vector2(2.5F, 1.0F)
+
+' Vector operations
+pos.X += 1.0F
+pos.Y += velocity.Y
+
+' Vector math (almost the same!)
+pos += velocity
+Dim distance As Single = Vector2.Distance(pos1, pos2)</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mt-3">
+                        <strong>⚠️ Important:</strong> MonoGame's <code>Vector2</code> properties are
+                        <strong>PascalCase</strong>
+                        (<code>X</code>, <code>Y</code>) instead of lowercase (<code>x</code>, <code>y</code>).
+                    </div>
+
+                    <h5 class="mt-3">Comparison of Common 2D Vector Mathematics</h5>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>vbPixelGameEngine (Vf2d)</th>
+                                <th>MonoGame (Vector2)</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>(lhs - rhs).Mag()</code></td>
+                                <td><code>Vector2.Distance(lhs, rhs)</code></td>
+                                <td>Distance between two vectors</td>
+                            </tr>
+                            <tr>
+                                <td><code>vec.Norm()</code></td>
+                                <td><code>Vector2.Normalize(vec)</code></td>
+                                <td>Returns unit vector (length 1)</td>
+                            </tr>
+                        </tbody>
+                        <tr>
+                            <td><code>lhs.Dot(rhs)</code></td>
+                            <td><code>Vector2.Dot(lhs, rhs)</code></td>
+                            <td>Dot product</td>
+                        </tr>
+                        <tr>
+                            <td><code>lhs.Cross(rhs)</code></td>
+                            <td><code>Vector2.Cross(lhs, rhs)</code></td>
+                            <td>Cross product (returns float)</td>
+                        </tr>
+                        <tr>
+                            <td><code>lhs.Lerp(rhs, t)</code></td>
+                            <td><code>Vector2.Lerp(lhs, rhs, t)</code></td>
+                            <td>Linear interpolation</td>
+                        </tr>
+                        <tr>
+                            <td><code>vec.Clamp(min, max)</code></td>
+                            <td><code>Vector2.Clamp(vec, min, max)</code></td>
+                            <td>Clamps vector to range</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Drawing Methods Section -->
+<div id="drawing" class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>🎨 Drawing Methods</h3>
+            </div>
+            <div class="card-body">
+                <p>
+                    The biggest difference is that MonoGame uses a <strong>SpriteBatch</strong> pattern.
+                    You must call <code>Begin()</code> before drawing and <code>End()</code> when done.
+                </p>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>vbPixelGameEngine</h5>
+                        <pre><code class="language-vb">' Draw text message
+DrawString(10, 10, "Hello World", Presets.White)
+
+' Draw outline & filled rectangle
+DrawRect(50, 50, 100, 80, Presets.Red)
+FillRect(50, 50, 100, 80, Presets.Blue)
+
+' Draw a line
+DrawLine(0, 0, 100, 100, Presets.Green)
+
+' Draw hollow and filled circles
+DrawCircle(200, 200, 50, Presets.Yellow)
+FillCircle(200, 200, 50, Presets.Orange)</code></pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>MonoGame</h5>
+                        <pre><code class="language-vb">' Start drawing batch
+spriteBatch.Begin()
+
+' Draw string
+spriteBatch.DrawString(font, "Hello World", 
+    New Vector2(10, 10), Color.White)
+
+' Draw rectangle (outline)
+Dim rect As New Rectangle(50, 50, 100, 80)
+spriteBatch.Draw(pixelTexture, rect, Color.Red)
+
+' Draw filled rectangle
+spriteBatch.Draw(pixelTexture, rect, Color.Blue)
+
+' Draw line (using texture)
+spriteBatch.Draw(pixelTexture, 
+    New Rectangle(0, 0, 100, 2), Color.Green)
+
+' Draw circle (using texture)
+DrawCircle(spriteBatch, pixelTexture, 
+    New Vector2(200, 200), 50, Color.Yellow)
+
+' End drawing batch
+spriteBatch.End()</code></pre>
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-3">
+                    <strong>💡 Tip:</strong> For drawing shapes in MonoGame, you typically use a 1x1 pixel texture
+                    and scale it. This is more flexible than vbPixelGameEngine's direct drawing methods.
+                </div>
+
+                <h5 class="mt-3">Extension Method for Drawing Circles in MonoGame</h5>
+                <pre><code class="language-vb">&lt;Runtime.CompilerServices.Extension&gt;
+Private Sub DrawCircle(spriteBatch As SpriteBatch, texture As Texture2D, center As Vector2, 
+                       radius As Integer, color As Color)
+    spriteBatch.Begin()
+    For x As Integer = -radius To radius
+        For y As Integer = -radius To radius
+            If x * x + y * y <= radius * radius Then
+                spriteBatch.Draw(texture, New Vector2(center.X + x, center.Y + y), color)
+            End If
+        Next
+    Next
+    spriteBatch.End()
+End Sub</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sprites Section -->
+<div id="sprites" class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>🖼️ Sprites & Textures</h3>
+            </div>
+            <div class="card-body">
+                <p>
+                    In vbPixelGameEngine, you use the <code>Sprite</code> class. In MonoGame, you use
+                    <code>Texture2D</code> for the image data and draw it using <code>SpriteBatch</code>.
+                </p>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>vbPixelGameEngine</h5>
+                        <pre><code class="language-vb">' Declare sprite at class level (loaded immediately)
+Private ReadOnly sprite As New Sprite("player.png")
+
+' Draw sprite at position in OnUserUpdate method
+DrawSprite(sprite, 100, 100)
+' Draw sprite with scale, as an integer value
+DrawSprite(sprite, 100, 100, scale:=2)
+' NOTE: Drawing sprite with rotation is not supported in `vbPixelGameEngine`.
+
+' Get sprite dimensions
+Dim width As Integer = sprite.width
+Dim height As Integer = sprite.height</code></pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>MonoGame</h5>
+                        <pre><code class="language-vb">' Define texture at class level
+Private texture As Texture2D 
+
+' Load texture in LoadContent method
+texture = Content.Load(Of Texture2D)("player")
+
+' In Draw method, draw texture at position
+spriteBatch.Draw(texture, New Vector2(100, 100), Color.White)
+' Draw with scale (float value supported)
+spriteBatch.Draw(texture, New Vector2(100, 100), Nothing, 
+    Color.White, 0.0F, Vector2.Zero, 2.0F, 
+    SpriteEffects.None, 0.0F)
+
+' Draw with rotation
+spriteBatch.Draw(texture, New Vector2(100, 100), Nothing, 
+    Color.White, MathHelper.ToRadians(45.0F), 
+    Vector2.Zero, 1.0F, SpriteEffects.None, 0.0F)
+
+' Get texture dimensions
+Dim width As Integer = texture.Width
+Dim height As Integer = texture.Height</code></pre>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <strong>⚠️ Important:</strong> In MonoGame, you must load textures in the
+                    <code>LoadContent()</code>
+                    method, not in the constructor or update loop.
+                </div>
+
+                <h5 class="mt-3">SpriteBatch.Draw Parameters</h5>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>texture</code></td>
+                            <td>The Texture2D to draw</td>
+                        </tr>
+                        <tr>
+                            <td><code>position</code></td>
+                            <td>Vector2 position (top-left)</td>
+                        </tr>
+                        <tr>
+                            <td><code>sourceRectangle</code></td>
+                            <td>Optional: portion of texture to draw</td>
+                        </tr>
+                        <tr>
+                            <td><code>color</code></td>
+                            <td>Tint color (use White for original)</td>
+                        </tr>
+                        <tr>
+                            <td><code>rotation</code></td>
+                            <td>Rotation in radians (use MathHelper.ToRadians)</td>
+                        </tr>
+                        <tr>
+                            <td><code>origin</code></td>
+                            <td>Rotation origin (Vector2.Zero for top-left)</td>
+                        </tr>
+                        <tr>
+                            <td><code>scale</code></td>
+                            <td>Scale factor (float or Vector2)</td>
+                        </tr>
+                        <tr>
+                            <td><code>effects</code></td>
+                            <td>SpriteEffects (None, FlipHorizontally, FlipVertically)</td>
+                        </tr>
+                        <tr>
+                            <td><code>layerDepth</code></td>
+                            <td>Draw order (0.0 = front, 1.0 = back)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Game Loop Section -->
+<div id="game-loop" class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>🔄 Game Loop Structure</h3>
+            </div>
+            <div class="card-body">
+                <p>
+                    MonoGame separates the game loop into two distinct methods: <code>Update()</code> for logic
+                    and <code>Draw()</code> for rendering.
+                </p>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>vbPixelGameEngine</h5>
+                        <pre><code class="language-vb">' Single update method
+Protected Overrides Function OnUserUpdate(elapsedTime As Single) As Boolean
+    ' Handle input
+    If GetKey(Key.W).Held Then
+        playerPos.y -= speed * elapsedTime
+    End If
+    
+    ' Update game logic
+    UpdatePlayer(elapsedTime)
+    UpdateEnemies(elapsedTime)
+    
+    ' Draw everything
+    Clear(Presets.DarkBlue)
+    DrawPlayer()
+    DrawEnemies()
+    DrawUI()
+    
+    Return True
+End Function</code></pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>MonoGame</h5>
+                        <pre><code class="language-vb">' Update method (logic only)
+Protected Overrides Sub Update(gameTime As GameTime)
+    ' Handle input
+    Dim keyboardState As KeyboardState = Keyboard.GetState()
+    Dim deltaTime As Single = CSng(gameTime.ElapsedGameTime.TotalSeconds)
+    If keyboardState.IsKeyDown(Keys.W) Then
+        playerPos.Y -= speed * deltaTime
+    End If
+    
+    ' Update game logic
+    UpdatePlayer(deltaTime)
+    UpdateEnemies(deltaTime)
+    
+    MyBase.Update(gameTime)
+End Sub
+
+' Draw method (rendering only)
+Protected Overrides Sub Draw(gameTime As GameTime)
+    GraphicsDevice.Clear(Color.CornflowerBlue)
+    
+    spriteBatch.Begin()
+    DrawPlayer(spriteBatch)
+    DrawEnemies(spriteBatch)
+    DrawUI(spriteBatch)
+    spriteBatch.End()
+    
+    MyBase.Draw(gameTime)
+End Sub</code></pre>
+                    </div>
+                </div>
+
+                <div class="alert alert-success mt-3">
+                    <strong>✅ Advantage:</strong> Separating Update and Draw makes your code cleaner and
+                    allows for better performance optimization.
+                </div>
+
+                <h5 class="mt-3">GameTime Usage</h5>
+                <pre><code class="language-vb">' Get elapsed time in seconds
+Dim deltaTime As Single = CSng(gameTime.ElapsedGameTime.TotalSeconds)
+
+' Get total game time
+Dim totalTime As Single = CSng(gameTime.TotalGameTime.TotalSeconds)
+
+' Use for frame-independent movement
+position += velocity * deltaTime</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Code Examples Section -->
+<div id="examples" class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>💻 Complete Code Examples</h3>
+            </div>
+            <div class="card-body">
+
+                <!-- Basic Game Example -->
+                <h5>Example 1: Basic Moving Player</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>vbPixelGameEngine</h6>
+                        <pre><code class="language-vb">Public Class MyGame
+    Inherits PixelGameEngine
+    
+    Private playerPos As Vi2d = New Vi2d(400, 300)
+    Private speed As Single = 200.0F
+    
+    Public Overrides Function OnUserCreate() As Boolean
+        Return True
+    End Function
+    
+    Protected Overrides Function OnUserUpdate(elapsedTime As Single) As Boolean
+        ' Movement
+        If GetKey(Key.W).Held Then
+            playerPos.y -= speed * elapsedTime
+        End If
+        If GetKey(Key.S).Held Then
+            playerPos.y += speed * elapsedTime
+        End If
+        If GetKey(Key.A).Held Then
+            playerPos.x -= speed * elapsedTime
+        End If
+        If GetKey(Key.D).Held Then
+            playerPos.x += speed * elapsedTime
+        End If
+        
+        ' Draw
+        Clear(Presets.DarkBlue)
+        FillRect(playerPos.x, playerPos.y, 32, 32, Presets.Red)
+        
+        Return True
+    End Function
+End Class</code></pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>MonoGame</h6>
+                        <pre><code class="language-vb">Public Class GameMain
+    Inherits Game
+    
+    Private graphics As GraphicsDeviceManager
+    Private spriteBatch As SpriteBatch
+    Private pixelTexture As Texture2D
+    Private playerPos As Vector2 = New Vector2(400.0F, 300.0F)
+    Private speed As Single = 200.0F
+    
+    Public Sub New()
+        graphics = New GraphicsDeviceManager(Me)
+        Content.RootDirectory = "Content"
+    End Sub
+    
+    Protected Overrides Sub LoadContent()
+        spriteBatch = New SpriteBatch(GraphicsDevice)
+        pixelTexture = New Texture2D(GraphicsDevice, 1, 1)
+        pixelTexture.SetData(Of Integer)({&HFFFFFFFF})
+    End Sub
+    
+    Protected Overrides Sub Update(gameTime As GameTime)
+        Dim keyboard As KeyboardState = Keyboard.GetState()
+        Dim deltaTime As Single = CSng(gameTime.ElapsedGameTime.TotalSeconds)
+        
+        If keyboard.IsKeyDown(Keys.W) Then
+            playerPos.Y -= speed * deltaTime
+        End If
+        If keyboard.IsKeyDown(Keys.S) Then
+            playerPos.Y += speed * deltaTime
+        End If
+        If keyboard.IsKeyDown(Keys.A) Then
+            playerPos.X -= speed * deltaTime
+        End If
+        If keyboard.IsKeyDown(Keys.D) Then
+            playerPos.X += speed * deltaTime
+        End If
+        
+        MyBase.Update(gameTime)
+    End Sub
+    
+    Protected Overrides Sub Draw(gameTime As GameTime)
+        GraphicsDevice.Clear(Color.CornflowerBlue)
+        
+        spriteBatch.Begin()
+        spriteBatch.Draw(pixelTexture, 
+            New Rectangle(CInt(playerPos.X), CInt(playerPos.Y), 32, 32), 
+            Color.Red)
+        spriteBatch.End()
+        
+        MyBase.Draw(gameTime)
+    End Sub
+End Class</code></pre>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Sprite Animation Example -->
+                <h5>Example 2: Animated Sprite</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>vbPixelGameEngine</h6>
+                        <pre><code class="language-vb">Private sprite As Sprite
+Private frameTimer As Single = 0.0F
+Private currentFrame As Integer = 0
+Private frameCount As Integer = 4
+Private frameTime As Single = 0.1F
+
+Public Overrides Function OnUserCreate() As Boolean
+    sprite = New Sprite("player.png")
+    Return True
+End Function
+
+Protected Overrides Function OnUserUpdate(elapsedTime As Single) As Boolean
+    frameTimer += elapsedTime
+    If frameTimer >= frameTime Then
+        currentFrame = (currentFrame + 1) Mod frameCount
+        frameTimer = 0.0F
+    End If
+    
+    Clear(Presets.DarkBlue)
+    
+    Dim frameWidth As Integer = sprite.width / frameCount
+    DrawPartialSprite(sprite, currentFrame * frameWidth, 0, 
+        frameWidth, sprite.height, 400, 300)
+    
+    Return True
+End Function</code></pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>MonoGame</h6>
+                        <pre><code class="language-vb">Private spriteSheet As Texture2D
+Private frameTimer As Single = 0.0F
+Private currentFrame As Integer = 0
+Private frameCount As Integer = 4
+Private frameTime As Single = 0.1F
+Private frameWidth As Integer
+
+Protected Overrides Sub LoadContent()
+    spriteBatch = New SpriteBatch(GraphicsDevice)
+    spriteSheet = Content.Load(Of Texture2D)("player")
+    frameWidth = spriteSheet.Width / frameCount
+End Sub
+
+Protected Overrides Sub Update(gameTime As GameTime)
+    frameTimer += CSng(gameTime.ElapsedGameTime.TotalSeconds)
+    If frameTimer >= frameTime Then
+        currentFrame = (currentFrame + 1) Mod frameCount
+        frameTimer = 0.0F
+    End If
+    
+    MyBase.Update(gameTime)
+End Sub
+
+Protected Overrides Sub Draw(gameTime As GameTime)
+    GraphicsDevice.Clear(Color.CornflowerBlue)
+    
+    spriteBatch.Begin()
+    Dim sourceRect As New Rectangle(
+        currentFrame * frameWidth, 0, 
+        frameWidth, spriteSheet.Height)
+    spriteBatch.Draw(spriteSheet, New Vector2(400, 300), 
+        sourceRect, Color.White)
+    spriteBatch.End()
+    
+    MyBase.Draw(gameTime)
+End Sub</code></pre>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pro Tips Section -->
+<div id="tips" class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>💡 Pro Tips for vbPixelGameEngine Developers</h3>
+            </div>
+            <div class="card-body">
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="alert alert-success">
+                            <h5>✅ Do This</h5>
+                            <ul class="mb-0">
+                                <li>Load all content in <code>LoadContent()</code></li>
+                                <li>Use <code>SpriteBatch.Begin()</code> and <code>End()</code> properly</li>
+                                <li>Separate Update and Draw logic</li>
+                                <li>Use <code>GameTime</code> for frame-independent movement</li>
+                                <li>Create a 1x1 pixel texture for shape drawing</li>
+                                <li>Use <code>Vector2</code> for all positions</li>
+                                <li>Use <code>MathHelper.ToRadians()</code> for rotations</li>
+                                <li>Dispose of textures when done (or let MonoGame handle it)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-danger">
+                            <h5>❌ Avoid This</h5>
+                            <ul class="mb-0">
+                                <li>Don't load content in Update or Draw loops</li>
+                                <li>Don't forget to call <code>SpriteBatch.End()</code></li>
+                                <li>Don't use hardcoded screen sizes</li>
+                                <li>Don't ignore <code>GameTime</code> for movement</li>
+                                <li>Don't create new objects in Update/Draw (GC pressure)</li>
+                                <li>Don't use lowercase property names (use X, Y not x, y)</li>
+                                <li>Don't use degrees directly (convert to radians)</li>
+                                <li>Don't mix Update and Draw logic</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h5 class="mt-4">Common Conversion Patterns</h5>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>vbPixelGameEngine</th>
+                            <th>MonoGame</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>ScreenWidth()</code>, <code>ScreenHeight()</code></td>
+                            <td><code>graphics.PreferredBackBufferWidth</code>,
+                                <code>graphics.PreferredBackBufferHeight</code>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>GetKey(Key.W).Held</code></td>
+                            <td><code>Keyboard.GetState().IsKeyDown(Keys.W)</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>GetMouseX()</code>, <code>GetMouseY()</code></td>
+                            <td><code>Mouse.GetState().X</code>, <code>Mouse.GetState().Y</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>DrawString(x, y, text, color)</code></td>
+                            <td><code>spriteBatch.DrawString(font, text, New Vector2(x, y), color)</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>DrawRect(x, y, w, h, color)</code></td>
+                            <td><code>spriteBatch.Draw(pixelTexture, New Rectangle(x, y, w, h), color)</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>FillRect(x, y, w, h, color)</code></td>
+                            <td><code>spriteBatch.Draw(pixelTexture, New Rectangle(x, y, w, h), color)</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>ClearScreen(color)</code></td>
+                            <td><code>GraphicsDevice.Clear(color)</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert alert-info mt-3">
+                    <strong>📚 Additional Resources:</strong>
+                    <ul class="mb-0">
+                        <li><a href="https://docs.monogame.net/" target="_blank">MonoGame Documentation</a></li>
+                        <li><a href="https://community.monogame.net/" target="_blank">MonoGame Community Forums</a>
+                        </li>
+                        <li><a href="https://github.com/MonoGame/MonoGame" target="_blank">MonoGame GitHub
+                            Repository</a></li>
+                        </ul>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Reference -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h5 class="card-title">🚀 Ready to Start?</h5>
+                    <p class="card-text">
+                        Now that you understand the key differences, head over to the
+                        <a asp-page="/VbCodeEditor" class="btn btn-primary">Code Editor</a>
+                        and start writing your first MonoGame game in VB.NET!
+                    </p>
+                    <p class="card-text">
+                        The scaffold code in the editor provides a solid starting point with all the
+                        essential MonoGame setup already done for you.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-vbnet.min.js"></script>
+    <style>
+        pre[class*="language-"] {
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 1px solid #2d2d2d;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        }
+
+        code[class*="language-"] {
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        text-shadow: none;
+        color: wheat;
+        }
+
+        .card-body pre {
+        margin-bottom: 0;
+        }
+
+        .card-body h6 {
+        margin-bottom: 12px;
+        color: #495057;
+        font-weight: 600;
+        font-size: 14px;
+        }
+
+        .card-body h6::before {
+        content: '💻';
+        margin-right: 6px;
+        }
+    </style>
+    <script>
+        // Smooth scrolling for navigation
+        document.querySelectorAll('.nav-link').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+        target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+        });
+        }
+        });
+        });
+
+        // Update active nav link on scroll
+        window.addEventListener('scroll', () => {
+        const sections = document.querySelectorAll('[id]');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        let current = '';
+        sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        if (pageYOffset >= sectionTop - 100) {
+        current = section.getAttribute('id');
+        }
+        });
+
+        navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+        link.classList.add('active');
+        }
+        });
+        });
+
+        // Highlight code on load
+        document.addEventListener('DOMContentLoaded', () => {
+        if (typeof Prism !== 'undefined') {
+        Prism.highlightAll();
+        }
+        });
+    </script>
+}

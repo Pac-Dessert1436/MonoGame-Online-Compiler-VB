@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <WasmBuildNative>true</WasmBuildNative>
+    <OutputType>Exe</OutputType>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionStrict>On</OptionStrict>
+    <OptionInfer>On</OptionInfer>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>WEBASSEMBLY</DefineConstants>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="ModuleEventRaiser.Generator" Version="1.1.7.9" />
+    <PackageReference Include="MonoGame.Framework" Version="3.8.5-preview.4" />
+    <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="8.0.*" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <WasmModule Include="Content\*.xnb" />
+  </ItemGroup>
+</Project>

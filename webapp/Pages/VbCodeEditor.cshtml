@@ -1,0 +1,201 @@
+@page
+@model VbCodeEditorModel
+@{
+    ViewData["Title"] = "VB.NET Code Editor";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Left Side: Code Editor -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>VB.NET Code Editor</h5>
+                    <small class="text-muted">Edit GameMain.vb below (Program.vb stays at backend)</small>
+                </div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="Compile">
+                        <input type="hidden" asp-for="SessionId" />
+
+                        <div class="mb-3">
+                            <label for="vbCode" class="form-label">GameMain.vb</label>
+                            <div id="monacoEditor" style="height: 500px; border: 1px solid #ccc; border-radius: 4px;"></div>
+                            <input type="hidden" asp-for="VbCode" id="vbCodeHidden" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(Model.CompilationError))
+                        {
+                            <div class="alert alert-danger">
+                                <strong>Compilation Error:</strong>
+                                <pre style="white-space: pre-wrap; word-wrap: break-word;">@Model.CompilationError</pre>
+                            </div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="handler" value="Compile" class="btn btn-primary">
+                                <i class="bi bi-play-fill"></i> Run Game
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="resetCode()">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset to Scaffold
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Asset Management -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Game Assets</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" asp-page-handler="CompileWithAssets">
+                        <input type="hidden" asp-for="SessionId" />
+                        <input type="hidden" asp-for="VbCode" id="hiddenVbCode" />
+
+                        <div class="mb-3">
+                            <label for="assetFiles" class="form-label">Upload Assets</label>
+                            <input type="file" class="form-control" id="assetFiles" name="assetFiles" multiple
+                                   accept=".png,.jpg,.jpeg,.gif,.bmp,.wav,.mp3,.ogg,.xnb" />
+                            <div class="form-text">
+                                Supported formats: PNG, JPG, GIF, BMP, WAV, MP3, OGG, XNB
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Current Assets</label>
+                            <div class="list-group" id="assetsList">
+                                <div class="list-group-item text-muted">
+                                    <small>No assets uploaded yet</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" name="handler" value="CompileWithAssets" class="btn btn-success">
+                                <i class="bi bi-gear-fill"></i> Build Content & Run
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearAssets()">
+                                <i class="bi bi-trash"></i> Clear Assets
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5>Help & Tips</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-3">
+                        <strong>📚 New to MonoGame?</strong> 
+                        <a asp-page="/Tutorial" class="alert-link">Check out our tutorial</a> 
+                        for VB.NET developers coming from vbPixelGameEngine!
+                    </div>
+                    <ul class="small">
+                        <li>Edit <code>GameMain.vb</code> in the left editor</li>
+                        <li>Upload game assets (images, sounds) on the right</li>
+                        <li>Click "Run Game" to compile and play</li>
+                        <li>Compilation takes ~30-40 seconds</li>
+                        <li>Syntax errors will be shown below the editor</li>
+                        <li><code>Program.vb</code> is managed by the backend with fixed content:</li>
+                        <code>
+                            Module Program<br>
+                            &ensp;&ensp;Sub Main()<br>
+                            &ensp;&ensp;&ensp;&ensp;Using game As New GameMain<br>
+                            &ensp;&ensp;&ensp;&ensp;&ensp;&ensp;game.Run()<br>
+                            &ensp;&ensp;&ensp;&ensp;End Using<br>
+                            &ensp;&ensp;End Sub<br>
+                            End Module<br>
+                        </code>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script>
+        let editor;
+
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
+        
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('monacoEditor'), {
+                value: `@Html.Raw(Model.VbCode.Replace("\r\n", "\n").Replace("\n", "\\n").Replace("\"", "\\\""))`,
+                language: 'vb',
+                theme: 'hc-black',
+                automaticLayout: true,
+                fontSize: 12,
+                fontFamily: "'Consolas', 'Monaco', monospace",
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                lineNumbers: 'on',
+                renderWhitespace: 'selection',
+                tabSize: 4,
+                insertSpaces: true
+            });
+
+            editor.onDidChangeModelContent(function() {
+                document.getElementById('vbCodeHidden').value = editor.getValue();
+            });
+        });
+
+        async function resetCode() {
+            if (confirm('Are you sure you want to reset to the scaffold code? All your changes will be lost.')) {
+                try {
+                    editor.setValue(`@VbCodeEditorModel.ScaffoldCode`.normalize("\n"));
+                } catch (error) {
+                    alert('Failed to load scaffold code: ' + error.message);
+                }
+            }
+        }
+
+        document.querySelector('form[enctype="multipart/form-data"]').addEventListener('submit', function () {
+            document.getElementById('hiddenVbCode').value = editor.getValue();
+        });
+
+        document.getElementById('assetFiles').addEventListener('change', function () {
+            const files = Array.from(this.files);
+            const assetsList = document.getElementById('assetsList');
+
+            if (files.length > 0) {
+                assetsList.innerHTML = files.map(file => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>${file.name}</span>
+                        <span class="badge bg-primary rounded-pill">${formatFileSize(file.size)}</span>
+                    </div>
+                `).join('');
+            } else {
+                assetsList.innerHTML = `
+                    <div class="list-group-item text-muted">
+                        <small>No assets uploaded yet</small>
+                    </div>
+                `;
+            }
+        });
+
+        function clearAssets() {
+            document.getElementById('assetFiles').value = '';
+            document.getElementById('assetsList').innerHTML = `
+                <div class="list-group-item text-muted">
+                    <small>No assets uploaded yet</small>
+                </div>
+            `;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+}

@@ -27,7 +27,6 @@ builder.Services.AddHttpClient("LocalClient", client =>
 
 // Register services
 builder.Services.AddScoped<MonoGameCompilerService>();
-builder.Services.AddScoped<EnhancedMonoGameCompilerService>();
 builder.Services.AddScoped<UserService>();
 
 // Configure CORS for development
@@ -52,13 +51,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseSession();
-
 app.UseRouting();
-
 app.UseCors("AllowAll");
-
 app.UseAuthorization();
 
 // Serve static files including compiled games

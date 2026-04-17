@@ -1,4 +1,4 @@
-# MonoGame Online Compiler VB
+# MonoGame VB.NET Online Compiler
 
 A web-based integrated development environment (IDE) for compiling VB.NET MonoGame games to WebAssembly, enabling high-performance 2D game development that runs natively in modern browsers. The backend portion is implemented using the latest version of C# and ASP.NET Core (see [Technology Stack](#️-technology-stack)).
 
@@ -76,8 +76,8 @@ MonoGame Online Compiler VB/
 
 1. Clone the repository and navigate to the project directory:
 ```bash
-git clone https://github.com/Pac-Dessert1436/MonoGame-Online-Compiler-VB.git
-cd MonoGame-Online-Compiler-VB
+git clone https://github.com/Pac-Dessert1436/MonoGame-VB-Online-Compiler.git
+cd MonoGame-VB-Online-Compiler
 ```
 
 2. Restore dependencies:

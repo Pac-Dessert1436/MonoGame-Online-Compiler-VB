@@ -6,28 +6,19 @@ namespace webapp.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ProjectController : ControllerBase
+public class ProjectController(UserService userService, ILogger<ProjectController> logger) : ControllerBase
 {
-    private readonly UserService _userService;
-    private readonly ILogger<ProjectController> _logger;
-
-    public ProjectController(UserService userService, ILogger<ProjectController> logger)
-    {
-        _userService = userService;
-        _logger = logger;
-    }
-
     [HttpGet("list")]
     public async Task<ActionResult<List<GameProject>>> GetUserProjects([FromQuery] int userId)
     {
         try
         {
-            var projects = await _userService.GetUserGameProjectsAsync(userId);
+            var projects = await userService.GetUserGameProjectsAsync(userId);
             return Ok(projects);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting projects for user {UserId}", userId);
+            logger.LogError(ex, "Error getting projects for user {UserId}", userId);
             return StatusCode(500, "Failed to retrieve projects");
         }
     }
@@ -37,7 +28,7 @@ public class ProjectController : ControllerBase
     {
         try
         {
-            var project = await _userService.GetGameProjectAsync(projectId, userId);
+            var project = await userService.GetGameProjectAsync(projectId, userId);
             if (project == null)
             {
                 return NotFound("Project not found");
@@ -46,7 +37,7 @@ public class ProjectController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting project {ProjectId}", projectId);
+            logger.LogError(ex, "Error getting project {ProjectId}", projectId);
             return StatusCode(500, "Failed to retrieve project");
         }
     }
@@ -61,7 +52,7 @@ public class ProjectController : ControllerBase
 
         try
         {
-            var project = await _userService.CreateGameProjectAsync(request.UserId, request.Name, request.VbCode);
+            var project = await userService.CreateGameProjectAsync(request.UserId, request.Name, request.VbCode);
             if (project == null)
             {
                 return BadRequest("Failed to create project");
@@ -70,7 +61,7 @@ public class ProjectController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating project for user {UserId}", request.UserId);
+            logger.LogError(ex, "Error creating project for user {UserId}", request.UserId);
             return StatusCode(500, "Failed to create project");
         }
     }
@@ -85,7 +76,7 @@ public class ProjectController : ControllerBase
 
         try
         {
-            var project = await _userService.UpdateGameProjectAsync(projectId, request.UserId, request.Name, request.VbCode);
+            var project = await userService.UpdateGameProjectAsync(projectId, request.UserId, request.Name, request.VbCode);
             if (project == null)
             {
                 return NotFound("Project not found");
@@ -94,7 +85,7 @@ public class ProjectController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating project {ProjectId}", projectId);
+            logger.LogError(ex, "Error updating project {ProjectId}", projectId);
             return StatusCode(500, "Failed to update project");
         }
     }
@@ -104,7 +95,7 @@ public class ProjectController : ControllerBase
     {
         try
         {
-            var success = await _userService.DeleteGameProjectAsync(projectId, userId);
+            var success = await userService.DeleteGameProjectAsync(projectId, userId);
             if (!success)
             {
                 return NotFound("Project not found");
@@ -113,7 +104,7 @@ public class ProjectController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting project {ProjectId}", projectId);
+            logger.LogError(ex, "Error deleting project {ProjectId}", projectId);
             return StatusCode(500, "Failed to delete project");
         }
     }
@@ -139,7 +130,7 @@ public class ProjectController : ControllerBase
                 await file.CopyToAsync(stream);
             }
 
-            var asset = await _userService.AddAssetAsync(projectId, userId, fileName, filePath, file.Length, file.ContentType);
+            var asset = await userService.AddAssetAsync(projectId, userId, fileName, filePath, file.Length, file.ContentType);
             if (asset == null)
             {
                 return BadRequest("Failed to add asset");
@@ -149,7 +140,7 @@ public class ProjectController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error adding asset to project {ProjectId}", projectId);
+            logger.LogError(ex, "Error adding asset to project {ProjectId}", projectId);
             return StatusCode(500, "Failed to add asset");
         }
     }
@@ -159,7 +150,7 @@ public class ProjectController : ControllerBase
     {
         try
         {
-            var success = await _userService.DeleteAssetAsync(assetId, userId);
+            var success = await userService.DeleteAssetAsync(assetId, userId);
             if (!success)
             {
                 return NotFound("Asset not found");
@@ -168,7 +159,7 @@ public class ProjectController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting asset {AssetId}", assetId);
+            logger.LogError(ex, "Error deleting asset {AssetId}", assetId);
             return StatusCode(500, "Failed to delete asset");
         }
     }
@@ -178,12 +169,12 @@ public class ProjectController : ControllerBase
     {
         try
         {
-            var history = await _userService.GetCompilationHistoryAsync(projectId, userId, limit);
+            var history = await userService.GetCompilationHistoryAsync(projectId, userId, limit);
             return Ok(history);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting compilation history for project {ProjectId}", projectId);
+            logger.LogError(ex, "Error getting compilation history for project {ProjectId}", projectId);
             return StatusCode(500, "Failed to retrieve compilation history");
         }
     }

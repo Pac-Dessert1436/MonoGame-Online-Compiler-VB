@@ -3,20 +3,13 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace webapp.Pages;
 
-public class GameRunnerModel : PageModel
+public class GameRunnerModel(IHttpClientFactory httpClientFactory) : PageModel
 {
     public string GameId { get; set; } = string.Empty;
     public string GameUrl { get; set; } = string.Empty;
     public string? CompilationError { get; set; }
     public string? CompilationOutput { get; set; }
     public string GameStatus { get; set; } = "Loading";
-
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public GameRunnerModel(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory;
-    }
 
     public async Task<IActionResult> OnGetAsync(string gameId)
     {
@@ -31,7 +24,7 @@ public class GameRunnerModel : PageModel
         // Check game status
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             var response = await httpClient.GetAsync($"api/monogame/status/{gameId}");
             
             if (response.IsSuccessStatusCode)

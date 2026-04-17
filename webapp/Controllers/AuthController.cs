@@ -6,17 +6,8 @@ namespace webapp.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController : ControllerBase
+public class AuthController(UserService userService, ILogger<AuthController> logger) : ControllerBase
 {
-    private readonly UserService _userService;
-    private readonly ILogger<AuthController> _logger;
-
-    public AuthController(UserService userService, ILogger<AuthController> logger)
-    {
-        _userService = userService;
-        _logger = logger;
-    }
-
     [HttpPost("register")]
     public async Task<ActionResult<AuthResult>> Register([FromBody] RegisterRequest request)
     {
@@ -27,7 +18,7 @@ public class AuthController : ControllerBase
 
         try
         {
-            var user = await _userService.CreateUserAsync(request.Username, request.Email, request.Password);
+            var user = await userService.CreateUserAsync(request.Username, request.Email, request.Password);
             if (user == null)
             {
                 return BadRequest("Username or email already exists");
@@ -43,7 +34,7 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during registration");
+            logger.LogError(ex, "Error during registration");
             return StatusCode(500, "Registration failed");
         }
     }
@@ -58,7 +49,7 @@ public class AuthController : ControllerBase
 
         try
         {
-            var user = await _userService.ValidateUserAsync(request.Email, request.Password);
+            var user = await userService.ValidateUserAsync(request.Email, request.Password);
             if (user == null)
             {
                 return Unauthorized("Invalid email or password");
@@ -75,7 +66,7 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login");
+            logger.LogError(ex, "Error during login");
             return StatusCode(500, "Login failed");
         }
     }

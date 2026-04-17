@@ -6,19 +6,8 @@ namespace webapp.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class EnhancedMonoGameController : ControllerBase
+public class EnhancedMonoGameController(EnhancedMonoGameCompilerService compilerService, UserService userService, ILogger<EnhancedMonoGameController> logger) : ControllerBase
 {
-    private readonly EnhancedMonoGameCompilerService _compilerService;
-    // private readonly UserService _userService;
-    // private readonly ILogger<EnhancedMonoGameController> _logger;
-
-    public EnhancedMonoGameController(EnhancedMonoGameCompilerService compilerService, UserService userService, ILogger<EnhancedMonoGameController> logger)
-    {
-        _compilerService = compilerService;
-        // _userService = userService;
-        // _logger = logger;
-    }
-
     [HttpPost("compile")]
     public async Task<ActionResult<CompilationResult>> CompileGame([FromBody] EnhancedCompileRequest request)
     {
@@ -28,7 +17,7 @@ public class EnhancedMonoGameController : ControllerBase
         }
 
         var sessionId = Guid.NewGuid().ToString();
-        var result = await _compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId);
+        var result = await compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId);
 
         if (result.Success)
         {
@@ -51,7 +40,7 @@ public class EnhancedMonoGameController : ControllerBase
         var sessionId = Guid.NewGuid().ToString();
         var newAssets = Request.Form.Files.ToList();
 
-        var result = await _compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId, newAssets);
+        var result = await compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId, newAssets);
 
         if (result.Success)
         {
@@ -89,14 +78,14 @@ public class EnhancedMonoGameController : ControllerBase
     [HttpGet("storage")]
     public async Task<ActionResult<Dictionary<string, long>>> GetStorageUsage()
     {
-        var usage = await _compilerService.GetStorageUsageAsync();
+        var usage = await compilerService.GetStorageUsageAsync();
         return Ok(usage);
     }
 
     [HttpPost("cleanup")]
     public async Task<ActionResult> CleanupOldGames([FromQuery] int daysOld = 7)
     {
-        var success = await _compilerService.CleanupOldCompiledGamesAsync(daysOld);
+        var success = await compilerService.CleanupOldCompiledGamesAsync(daysOld);
         if (success)
         {
             return Ok(new { Message = $"Cleanup completed successfully. Removed games older than {daysOld} days." });

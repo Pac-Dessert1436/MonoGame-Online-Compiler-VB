@@ -20,7 +20,7 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
     
-    public ICollection<GameProject> GameProjects { get; set; } = new List<GameProject>();
+    public ICollection<GameProject> GameProjects { get; set; } = [];
 }
 
 public class GameProject
@@ -40,8 +40,8 @@ public class GameProject
     public int UserId { get; set; }
     public User User { get; set; } = null!;
     
-    public ICollection<GameAsset> Assets { get; set; } = new List<GameAsset>();
-    public ICollection<CompilationSession> CompilationSessions { get; set; } = new List<CompilationSession>();
+    public ICollection<GameAsset> Assets { get; set; } = [];
+    public ICollection<CompilationSession> CompilationSessions { get; set; } = [];
 }
 
 public class GameAsset

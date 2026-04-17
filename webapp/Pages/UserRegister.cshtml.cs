@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace webapp.Pages;
 
-public class UserRegisterModel : PageModel
+public partial class UserRegisterModel(IHttpClientFactory httpClientFactory, ILogger<UserRegisterModel> logger) : PageModel
 {
     [BindProperty]
     public string Username { get; set; } = string.Empty;
@@ -20,18 +20,12 @@ public class UserRegisterModel : PageModel
     public string? ErrorMessage { get; set; }
     public string? SuccessMessage { get; set; }
 
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<UserRegisterModel> _logger;
-
-    public UserRegisterModel(IHttpClientFactory httpClientFactory, ILogger<UserRegisterModel> logger)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-    }
-
     public void OnGet()
     {
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "New user {Username} registered successfully")]
+    partial void LogNewUserRegister(string username);
 
     public async Task<IActionResult> OnPostRegisterAsync()
     {
@@ -56,7 +50,7 @@ public class UserRegisterModel : PageModel
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             var response = await httpClient.PostAsJsonAsync("api/auth/register", new { Username, Email, Password });
 
             if (response.IsSuccessStatusCode)
@@ -65,9 +59,7 @@ public class UserRegisterModel : PageModel
                 if (result?.Success == true)
                 {
                     SuccessMessage = "Registration successful! Please login.";
-                    
-                    _logger.LogInformation("New user {Username} registered successfully", Username);
-                    
+                    LogNewUserRegister(Username);
                     return RedirectToPage("/UserLogin", new { message = "Registration successful! Please login." });
                 }
                 else
@@ -83,7 +75,7 @@ public class UserRegisterModel : PageModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during registration");
+            logger.LogError(ex, "Error during registration");
             ErrorMessage = "An error occurred during registration. Please try again.";
         }
 

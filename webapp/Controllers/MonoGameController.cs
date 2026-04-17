@@ -5,17 +5,8 @@ namespace webapp.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class MonoGameController : ControllerBase
+public class MonoGameController(MonoGameCompilerService compilerService, ILogger<MonoGameController> logger) : ControllerBase
 {
-    private readonly MonoGameCompilerService _compilerService;
-    private readonly ILogger<MonoGameController> _logger;
-
-    public MonoGameController(MonoGameCompilerService compilerService, ILogger<MonoGameController> logger)
-    {
-        _compilerService = compilerService;
-        _logger = logger;
-    }
-
     [HttpPost("compile")]
     public async Task<ActionResult<CompilationResult>> CompileGame([FromBody] CompileRequest request)
     {
@@ -25,7 +16,7 @@ public class MonoGameController : ControllerBase
         }
 
         var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
-        var result = await _compilerService.CompileGameAsync(request.VbCode, sessionId);
+        var result = await compilerService.CompileGameAsync(request.VbCode, sessionId);
 
         if (result.Success)
         {
@@ -51,7 +42,7 @@ public class MonoGameController : ControllerBase
         var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
         var assets = Request.Form.Files.Where(f => f != request.VbCodeFile).ToList();
 
-        var result = await _compilerService.CompileGameAsync(vbCode, sessionId, assets);
+        var result = await compilerService.CompileGameAsync(vbCode, sessionId, assets);
 
         if (result.Success)
         {

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace webapp.Pages;
 
-public class ProjectManagerModel : PageModel
+public class ProjectManagerModel(IHttpClientFactory httpClientFactory, ILogger<ProjectManagerModel> logger) : PageModel
 {
     [BindProperty]
     public string ProjectName { get; set; } = string.Empty;
@@ -19,15 +19,6 @@ public class ProjectManagerModel : PageModel
     public List<GameProject>? Projects { get; set; }
     public string? ErrorMessage { get; set; }
     public string? SuccessMessage { get; set; }
-
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<ProjectManagerModel> _logger;
-
-    public ProjectManagerModel(IHttpClientFactory httpClientFactory, ILogger<ProjectManagerModel> logger)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-    }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -48,7 +39,7 @@ public class ProjectManagerModel : PageModel
     {
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             var response = await httpClient.GetAsync($"api/project/list?userId={UserId}");
 
             if (response.IsSuccessStatusCode)
@@ -57,14 +48,14 @@ public class ProjectManagerModel : PageModel
             }
             else
             {
-                _logger.LogError("Failed to load projects for user {UserId}", UserId);
-                Projects = new List<GameProject>();
+                logger.LogError("Failed to load projects for user {UserId}", UserId);
+                Projects = [];
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error loading projects");
-            Projects = new List<GameProject>();
+            logger.LogError(ex, "Error loading projects");
+            Projects = [];
         }
     }
 
@@ -88,10 +79,10 @@ public class ProjectManagerModel : PageModel
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             var response = await httpClient.PostAsJsonAsync("api/project/create", new 
-            { 
-                UserId = UserId, 
+            {
+                UserId, 
                 Name = ProjectName, 
                 VbCode = string.IsNullOrWhiteSpace(InitialCode) ? ScaffoldCode : InitialCode 
             });
@@ -102,7 +93,7 @@ public class ProjectManagerModel : PageModel
                 if (result != null)
                 {
                     SuccessMessage = $"Project '{ProjectName}' created successfully!";
-                    _logger.LogInformation("Project {ProjectName} created for user {UserId}", ProjectName, UserId);
+                    logger.LogInformation("Project {ProjectName} created for user {UserId}", ProjectName, UserId);
                 }
             }
             else
@@ -113,7 +104,7 @@ public class ProjectManagerModel : PageModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating project");
+            logger.LogError(ex, "Error creating project");
             ErrorMessage = "An error occurred while creating the project. Please try again.";
         }
 
@@ -141,13 +132,13 @@ public class ProjectManagerModel : PageModel
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             var response = await httpClient.DeleteAsync($"api/project/{DeleteProjectId}?userId={UserId}");
 
             if (response.IsSuccessStatusCode)
             {
                 SuccessMessage = "Project deleted successfully!";
-                _logger.LogInformation("Project {ProjectId} deleted by user {UserId}", DeleteProjectId, UserId);
+                logger.LogInformation("Project {ProjectId} deleted by user {UserId}", DeleteProjectId, UserId);
             }
             else
             {
@@ -157,7 +148,7 @@ public class ProjectManagerModel : PageModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting project");
+            logger.LogError(ex, "Error deleting project");
             ErrorMessage = "An error occurred while deleting the project. Please try again.";
         }
 
@@ -228,7 +219,7 @@ public class GameProject
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public int UserId { get; set; }
-    public List<GameAsset> Assets { get; set; } = new List<GameAsset>();
+    public List<GameAsset> Assets { get; set; } = [];
 }
 
 public class GameAsset

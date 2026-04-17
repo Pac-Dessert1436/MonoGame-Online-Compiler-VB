@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace webapp.Pages;
 
-public class VbCodeEditorModel : PageModel
+public partial class VbCodeEditorModel(IHttpClientFactory httpClientFactory, ILogger<VbCodeEditorModel> logger) : PageModel
 {
     [BindProperty]
     public string VbCode { get; set; } = string.Empty;
@@ -22,15 +22,6 @@ public class VbCodeEditorModel : PageModel
     public int UserId { get; set; }
     public string Username { get; set; } = string.Empty;
     public bool IsAuthenticated { get; set; }
-
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<VbCodeEditorModel> _logger;
-
-    public VbCodeEditorModel(IHttpClientFactory httpClientFactory, ILogger<VbCodeEditorModel> logger)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-    }
 
     internal const string ScaffoldCode = @"Imports Microsoft.Xna.Framework
 Imports Microsoft.Xna.Framework.Graphics
@@ -162,7 +153,7 @@ End Class";
     {
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             var response = await httpClient.GetAsync($"api/project/{ProjectId}?userId={UserId}");
 
             if (response.IsSuccessStatusCode)
@@ -176,33 +167,36 @@ End Class";
             }
             else
             {
-                _logger.LogError("Failed to load project {ProjectId} for user {UserId}", ProjectId, UserId);
+                logger.LogError("Failed to load project {ProjectId} for user {UserId}", ProjectId, UserId);
                 VbCode = ScaffoldCode;
                 ProjectName = "Error Loading Project";
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error loading project");
+            logger.LogError(ex, "Error loading project");
             VbCode = ScaffoldCode;
             ProjectName = "Error Loading Project";
         }
     }
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "OnPostCompileAsync called. VbCode length: {Length}")]
+    partial void LogVbCodeLength(int length);
+
     public async Task<IActionResult> OnPostCompileAsync()
     {
-        _logger.LogInformation("OnPostCompileAsync called. VbCode length: {Length}", VbCode?.Length ?? 0);
+        LogVbCodeLength(VbCode?.Length ?? 0);
 
         if (string.IsNullOrWhiteSpace(VbCode))
         {
-            _logger.LogWarning("VbCode is empty or whitespace");
+            logger.LogWarning("VbCode is empty or whitespace");
             ModelState.AddModelError("VbCode", "VB.NET code is required");
             return Page();
         }
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             
             // Update project with current code
             await UpdateProjectAsync();
@@ -231,7 +225,7 @@ End Class";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during compilation");
+            logger.LogError(ex, "Error during compilation");
             CompilationError = $"Error during compilation: {ex.Message}";
         }
 
@@ -242,34 +236,34 @@ End Class";
     {
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             await httpClient.PutAsJsonAsync($"api/project/{ProjectId}", new 
-            { 
-                UserId = UserId, 
-                Name = ProjectName, 
-                VbCode = VbCode 
+            {
+                UserId, 
+                Name = ProjectName,
+                VbCode
             });
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to update project {ProjectId}", ProjectId);
+            logger.LogWarning(ex, "Failed to update project {ProjectId}", ProjectId);
         }
     }
 
     public async Task<IActionResult> OnPostCompileWithAssetsAsync()
     {
-        _logger.LogInformation("OnPostCompileWithAssetsAsync called. VbCode length: {Length}", VbCode?.Length ?? 0);
+        logger.LogInformation("OnPostCompileWithAssetsAsync called. VbCode length: {Length}", VbCode?.Length ?? 0);
 
         if (string.IsNullOrWhiteSpace(VbCode))
         {
-            _logger.LogWarning("VbCode is empty or whitespace in CompileWithAssets");
+            logger.LogWarning("VbCode is empty or whitespace in CompileWithAssets");
             ModelState.AddModelError("VbCode", "VB.NET code is required");
             return Page();
         }
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             
             // Update project with current code
             await UpdateProjectAsync();

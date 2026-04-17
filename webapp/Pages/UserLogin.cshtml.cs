@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace webapp.Pages;
 
-public class UserLoginModel : PageModel
+public partial class UserLoginModel(IHttpClientFactory httpClientFactory, ILogger<UserLoginModel> logger) : PageModel
 {
     [BindProperty]
     public string Email { get; set; } = string.Empty;
@@ -14,18 +14,12 @@ public class UserLoginModel : PageModel
     public string? ErrorMessage { get; set; }
     public string? SuccessMessage { get; set; }
 
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<UserLoginModel> _logger;
-
-    public UserLoginModel(IHttpClientFactory httpClientFactory, ILogger<UserLoginModel> logger)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-    }
-
     public void OnGet()
     {
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} logged in successfully")]
+    partial void LogUserLogin(string username);
 
     public async Task<IActionResult> OnPostLoginAsync()
     {
@@ -37,7 +31,7 @@ public class UserLoginModel : PageModel
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
+            var httpClient = httpClientFactory.CreateClient("LocalClient");
             var response = await httpClient.PostAsJsonAsync("api/auth/login", new { Email, Password });
 
             if (response.IsSuccessStatusCode)
@@ -47,8 +41,7 @@ public class UserLoginModel : PageModel
                 {
                     HttpContext.Session.SetInt32("UserId", result.UserId);
                     HttpContext.Session.SetString("Username", result.Username);
-                    
-                    _logger.LogInformation("User {Username} logged in successfully", result.Username);
+                    LogUserLogin(result.Username);
                     return RedirectToPage("/ProjectManager");
                 }
                 else
@@ -64,7 +57,7 @@ public class UserLoginModel : PageModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login");
+            logger.LogError(ex, "Error during login");
             ErrorMessage = "An error occurred during login. Please try again.";
         }
 

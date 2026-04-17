@@ -3,20 +3,11 @@ using webapp.Models;
 
 namespace webapp.Services;
 
-public class UserService
+public class UserService(AppDbContext context, ILogger<UserService> logger)
 {
-    private readonly AppDbContext _context;
-    private readonly ILogger<UserService> _logger;
-
-    public UserService(AppDbContext context, ILogger<UserService> logger)
-    {
-        _context = context;
-        _logger = logger;
-    }
-
     public async Task<User?> CreateUserAsync(string username, string email, string password)
     {
-        var existingUser = await _context.Users
+        var existingUser = await context.Users
             .FirstOrDefaultAsync(u => u.Email == email || u.Username == username);
         
         if (existingUser != null)
@@ -32,16 +23,16 @@ public class UserService
             CreatedAt = DateTime.UtcNow
         };
 
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
 
-        _logger.LogInformation("Created new user: {Username}", username);
+        logger.LogInformation("Created new user: {Username}", username);
         return user;
     }
 
     public async Task<User?> ValidateUserAsync(string email, string password)
     {
-        var user = await _context.Users
+        var user = await context.Users
             .FirstOrDefaultAsync(u => u.Email == email);
         
         if (user == null)
@@ -54,7 +45,7 @@ public class UserService
         if (isValid)
         {
             user.LastLoginAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         return isValid ? user : null;
@@ -62,7 +53,7 @@ public class UserService
 
     public async Task<User?> GetUserByIdAsync(int userId)
     {
-        return await _context.Users
+        return await context.Users
             .Include(u => u.GameProjects)
             .FirstOrDefaultAsync(u => u.Id == userId);
     }
@@ -77,16 +68,16 @@ public class UserService
             CreatedAt = DateTime.UtcNow
         };
 
-        _context.GameProjects.Add(project);
-        await _context.SaveChangesAsync();
+        context.GameProjects.Add(project);
+        await context.SaveChangesAsync();
 
-        _logger.LogInformation("Created game project: {Name} for user: {UserId}", name, userId);
+        logger.LogInformation("Created game project: {Name} for user: {UserId}", name, userId);
         return project;
     }
 
     public async Task<GameProject?> GetGameProjectAsync(int projectId, int userId)
     {
-        return await _context.GameProjects
+        return await context.GameProjects
             .Include(p => p.Assets)
             .Include(p => p.CompilationSessions.OrderByDescending(s => s.StartedAt).Take(10))
             .FirstOrDefaultAsync(p => p.Id == projectId && p.UserId == userId);
@@ -94,7 +85,7 @@ public class UserService
 
     public async Task<List<GameProject>> GetUserGameProjectsAsync(int userId)
     {
-        return await _context.GameProjects
+        return await context.GameProjects
             .Where(p => p.UserId == userId)
             .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
             .ToListAsync();
@@ -102,7 +93,7 @@ public class UserService
 
     public async Task<GameProject?> UpdateGameProjectAsync(int projectId, int userId, string name, string vbCode)
     {
-        var project = await _context.GameProjects
+        var project = await context.GameProjects
             .FirstOrDefaultAsync(p => p.Id == projectId && p.UserId == userId);
         
         if (project == null)
@@ -114,13 +105,13 @@ public class UserService
         project.VbCode = vbCode;
         project.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return project;
     }
 
     public async Task<bool> DeleteGameProjectAsync(int projectId, int userId)
     {
-        var project = await _context.GameProjects
+        var project = await context.GameProjects
             .FirstOrDefaultAsync(p => p.Id == projectId && p.UserId == userId);
         
         if (project == null)
@@ -128,16 +119,16 @@ public class UserService
             return false;
         }
 
-        _context.GameProjects.Remove(project);
-        await _context.SaveChangesAsync();
+        context.GameProjects.Remove(project);
+        await context.SaveChangesAsync();
         
-        _logger.LogInformation("Deleted game project: {ProjectId}", projectId);
+        logger.LogInformation("Deleted game project: {ProjectId}", projectId);
         return true;
     }
 
     public async Task<GameAsset?> AddAssetAsync(int projectId, int userId, string fileName, string filePath, long fileSize, string contentType)
     {
-        var project = await _context.GameProjects
+        var project = await context.GameProjects
             .FirstOrDefaultAsync(p => p.Id == projectId && p.UserId == userId);
         
         if (project == null)
@@ -155,15 +146,15 @@ public class UserService
             UploadedAt = DateTime.UtcNow
         };
 
-        _context.GameAssets.Add(asset);
-        await _context.SaveChangesAsync();
+        context.GameAssets.Add(asset);
+        await context.SaveChangesAsync();
 
         return asset;
     }
 
     public async Task<bool> DeleteAssetAsync(int assetId, int userId)
     {
-        var asset = await _context.GameAssets
+        var asset = await context.GameAssets
             .Include(a => a.GameProject)
             .FirstOrDefaultAsync(a => a.Id == assetId && a.GameProject.UserId == userId);
         
@@ -181,18 +172,18 @@ public class UserService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to delete asset file: {FilePath}", asset.FilePath);
+            logger.LogWarning(ex, "Failed to delete asset file: {FilePath}", asset.FilePath);
         }
 
-        _context.GameAssets.Remove(asset);
-        await _context.SaveChangesAsync();
+        context.GameAssets.Remove(asset);
+        await context.SaveChangesAsync();
 
         return true;
     }
 
     public async Task<CompilationSession?> CreateCompilationSessionAsync(int projectId, int userId, string sessionId)
     {
-        var project = await _context.GameProjects
+        var project = await context.GameProjects
             .FirstOrDefaultAsync(p => p.Id == projectId && p.UserId == userId);
         
         if (project == null)
@@ -207,15 +198,15 @@ public class UserService
             StartedAt = DateTime.UtcNow
         };
 
-        _context.CompilationSessions.Add(session);
-        await _context.SaveChangesAsync();
+        context.CompilationSessions.Add(session);
+        await context.SaveChangesAsync();
 
         return session;
     }
 
     public async Task<CompilationSession?> UpdateCompilationSessionAsync(int sessionId, bool success, string? errorMessage = null, string? output = null, string? compiledGamePath = null)
     {
-        var session = await _context.CompilationSessions
+        var session = await context.CompilationSessions
             .FirstOrDefaultAsync(s => s.Id == sessionId);
         
         if (session == null)
@@ -229,13 +220,13 @@ public class UserService
         session.CompiledGamePath = compiledGamePath;
         session.CompletedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return session;
     }
 
     public async Task<List<CompilationSession>> GetCompilationHistoryAsync(int projectId, int userId, int limit = 10)
     {
-        return await _context.CompilationSessions
+        return await context.CompilationSessions
             .Where(s => s.GameProjectId == projectId && s.GameProject.UserId == userId)
             .OrderByDescending(s => s.StartedAt)
             .Take(limit)

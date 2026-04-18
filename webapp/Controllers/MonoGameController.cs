@@ -31,7 +31,7 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
 
     // Enhanced compilation endpoint with project/user tracking (from EnhancedMonoGameController)
     [HttpPost("compile-enhanced")]
-    public async Task<ActionResult<CompilationResult>> CompileGameEnhanced([FromBody] EnhancedCompileRequest request)
+    public async Task<ActionResult<CompilationResult>> CompileGameEnhanced([FromBody] CompileRequest request)
     {
         if (request.ProjectId <= 0 || request.UserId <= 0)
         {
@@ -79,7 +79,7 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
     }
 
     [HttpPost("compile-enhanced-with-assets")]
-    public async Task<ActionResult<CompilationResult>> CompileGameEnhancedWithAssets([FromForm] EnhancedCompileWithAssetsRequest request)
+    public async Task<ActionResult<CompilationResult>> CompileGameEnhancedWithAssets([FromForm] CompileWithAssetsRequest request)
     {
         if (request.ProjectId <= 0 || request.UserId <= 0)
         {
@@ -148,7 +148,7 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
 }
 
 // Compilation result model
-public class CompilationResult
+public sealed class CompilationResult
 {
     public bool Success { get; set; }
     public string? GameId { get; set; }
@@ -159,26 +159,18 @@ public class CompilationResult
 }
 
 // Request models from both controllers
-public class CompileRequest
+public sealed class CompileRequest
 {
     public string VbCode { get; set; } = string.Empty;
     public string? SessionId { get; set; }
-}
-
-public class CompileWithAssetsRequest
-{
-    public IFormFile? VbCodeFile { get; set; }
-    public string? SessionId { get; set; }
-}
-
-public class EnhancedCompileRequest
-{
     public int ProjectId { get; set; }
     public int UserId { get; set; }
 }
 
-public class EnhancedCompileWithAssetsRequest
+public sealed class CompileWithAssetsRequest
 {
+    public IFormFile? VbCodeFile { get; set; }
+    public string? SessionId { get; set; }
     public int ProjectId { get; set; }
     public int UserId { get; set; }
 }

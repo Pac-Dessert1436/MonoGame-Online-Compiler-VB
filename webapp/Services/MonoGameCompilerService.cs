@@ -5,7 +5,7 @@ using webapp.Models;
 
 namespace webapp.Services;
 
-public class MonoGameCompilerService
+public sealed class MonoGameCompilerService
 {
     private readonly ILogger<MonoGameCompilerService> _logger;
     private readonly string _monoGameProjectPath;
@@ -52,7 +52,7 @@ public class MonoGameCompilerService
             await UpdateGameMainAsync(tempProjectPath, vbCode);
 
             // Handle assets if provided
-            if (assets != null && assets.Any())
+            if (assets != null && assets.Count != 0)
             {
                 await HandleAssetsAsync(tempProjectPath, assets);
             }
@@ -236,7 +236,7 @@ public class MonoGameCompilerService
         }
     }
 
-    private async Task UpdateGameMainAsync(string projectPath, string vbCode)
+    private static async Task UpdateGameMainAsync(string projectPath, string vbCode)
     {
         var gameMainPath = Path.Combine(projectPath, "GameMain.vb");
         await File.WriteAllTextAsync(gameMainPath, vbCode);
@@ -272,7 +272,7 @@ public class MonoGameCompilerService
         }
 
         // Handle new assets
-        if (newAssets != null && newAssets.Any())
+        if (newAssets != null && newAssets.Count != 0)
         {
             foreach (var asset in newAssets)
             {
@@ -427,7 +427,7 @@ public class MonoGameCompilerService
 }
 
 // Compilation result model
-public class CompilationResult
+public sealed class CompilationResult
 {
     public bool Success { get; set; }
     public string? GameId { get; set; }

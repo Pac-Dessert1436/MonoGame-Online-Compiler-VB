@@ -180,14 +180,14 @@ public class ProjectController(UserService userService, ILogger<ProjectControlle
     }
 }
 
-public class CreateProjectRequest
+public sealed class CreateProjectRequest
 {
     public int UserId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string VbCode { get; set; } = string.Empty;
 }
 
-public class UpdateProjectRequest
+public sealed class UpdateProjectRequest
 {
     public int UserId { get; set; }
     public string Name { get; set; } = string.Empty;

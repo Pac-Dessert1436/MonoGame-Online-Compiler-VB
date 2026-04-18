@@ -201,7 +201,7 @@ End Class";
     {
         _logger.LogInformation("OnPostCompileAsync called");
         LogVbCodeLength(VbCode?.Length ?? 0);
-        
+
         if (!string.IsNullOrEmpty(VbCode))
         {
             LogVbCodeContentPreview(VbCode[..Math.Min(100, VbCode.Length)]);
@@ -222,8 +222,8 @@ End Class";
             await UpdateProjectAsync();
 
             // Compile the project using the enhanced compilation endpoint
-            var response = await httpClient.PostAsJsonAsync("api/monogame/compile-enhanced", new EnhancedCompileRequest { ProjectId = ProjectId, UserId = UserId });
-            
+            var response = await httpClient.PostAsJsonAsync("api/monogame/compile-enhanced", new CompileRequest { ProjectId = ProjectId, UserId = UserId });
+
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<CompilationResult>();
@@ -257,9 +257,9 @@ End Class";
         try
         {
             var httpClient = _httpClientFactory.CreateClient("LocalClient");
-            await httpClient.PutAsJsonAsync($"api/project/{ProjectId}", new 
+            await httpClient.PutAsJsonAsync($"api/project/{ProjectId}", new
             {
-                UserId, 
+                UserId,
                 Name = ProjectName,
                 VbCode
             });
@@ -294,7 +294,7 @@ End Class";
             content.Add(new StringContent(ProjectId.ToString()), "ProjectId");
             content.Add(new StringContent(UserId.ToString()), "UserId");
             content.Add(new StringContent(VbCode), "VbCode"); // Add VbCode explicitly
-            
+
             if (AssetFiles != null)
             {
                 foreach (var file in AssetFiles)
@@ -304,7 +304,7 @@ End Class";
             }
 
             var response = await httpClient.PostAsync("api/monogame/compile-with-new-assets", content);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<CompilationResult>();
@@ -333,7 +333,7 @@ End Class";
     }
 }
 
-public class CompilationResult
+public sealed class CompilationResult
 {
     public bool Success { get; set; }
     public string? GameId { get; set; }

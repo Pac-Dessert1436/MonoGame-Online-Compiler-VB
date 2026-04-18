@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using webapp.Services;
-using webapp.Models;
 
 namespace webapp.Controllers;
 
@@ -72,20 +71,20 @@ public class AuthController(UserService userService, ILogger<AuthController> log
     }
 }
 
-public class RegisterRequest
+public sealed class RegisterRequest
 {
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 }
 
-public class LoginRequest
+public sealed class LoginRequest
 {
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 }
 
-public class AuthResult
+public sealed class AuthResult
 {
     public bool Success { get; set; }
     public int UserId { get; set; }

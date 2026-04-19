@@ -150,19 +150,19 @@ Public Class GameMain
     End Sub
 
     Protected Overrides Sub Update(gameTime As GameTime)
-        Dim keyboard As KeyboardState = Keyboard.GetState()
+        Dim keyState As KeyboardState = Keyboard.GetState()
         Dim deltaTime As Single = CSng(gameTime.ElapsedGameTime.TotalSeconds)
 
-        If keyboard.IsKeyDown(Keys.W) Then
+        If keyState.IsKeyDown(Keys.W) Then
             _position.Y -= _speed * deltaTime
         End If
-        If keyboard.IsKeyDown(Keys.S) Then
+        If keyState.IsKeyDown(Keys.S) Then
             _position.Y += _speed * deltaTime
         End If
-        If keyboard.IsKeyDown(Keys.A) Then
+        If keyState.IsKeyDown(Keys.A) Then
             _position.X -= _speed * deltaTime
         End If
-        If keyboard.IsKeyDown(Keys.D) Then
+        If keyState.IsKeyDown(Keys.D) Then
             _position.X += _speed * deltaTime
         End If
 

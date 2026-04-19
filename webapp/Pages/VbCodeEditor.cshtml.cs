@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using webapp.Controllers;
+using webapp.Models;
 
 namespace webapp.Pages;
 
@@ -18,8 +19,14 @@ public partial class VbCodeEditorModel : PageModel
     [BindProperty]
     public List<IFormFile>? AssetFiles { get; set; }
 
+    [BindProperty]
     public string? CompilationError { get; set; }
     public string? GameUrl { get; set; }
+    public bool IsCompiling { get; set; }
+    public string? CompilationGameId { get; set; }
+    public string? CompilationStatus { get; set; }
+
+    [BindProperty]
     public int UserId { get; set; }
     public string Username { get; set; } = string.Empty;
     public bool IsAuthenticated { get; set; }
@@ -133,7 +140,7 @@ Public Class GameMain
     End Sub
 End Class";
 
-    public async Task<IActionResult> OnGetAsync(int? projectId)
+    public async Task<IActionResult> OnGetAsync(int? projectId, string? compilationGameId)
     {
         var userId = HttpContext.Session.GetInt32("UserId");
         if (!userId.HasValue)
@@ -145,6 +152,12 @@ End Class";
         Username = HttpContext.Session.GetString("Username") ?? "User";
         IsAuthenticated = true;
 
+        // Check compilation status if compilationGameId is provided
+        if (!string.IsNullOrEmpty(compilationGameId))
+        {
+            await CheckCompilationStatusAsync(compilationGameId);
+        }
+
         if (projectId.HasValue)
         {
             ProjectId = projectId.Value;
@@ -152,12 +165,111 @@ End Class";
         }
         else
         {
-            VbCode = ScaffoldCode;
-            ProjectName = "New Project";
+            // Create a new project in the database
+            try
+            {
+                var httpClient = _httpClientFactory.CreateClient("LocalClient");
+                var createRequest = new { UserId, Name = "New Project", VbCode = ScaffoldCode };
+                var response = await httpClient.PostAsJsonAsync("api/project/create", createRequest);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var project = await response.Content.ReadFromJsonAsync<GameProject>();
+                    if (project != null)
+                    {
+                        ProjectId = project.Id;
+                        VbCode = project.VbCode;
+                        ProjectName = project.Name;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating new project");
+                // Fallback to scaffold code if project creation fails
+                VbCode = ScaffoldCode;
+                ProjectName = "New Project";
+            }
         }
 
         _logger.LogInformation("OnGetAsync called. ProjectId: {ProjectId}, VbCode length: {Length}", ProjectId, VbCode?.Length ?? 0);
         return Page();
+    }
+
+    private async Task CheckCompilationStatusAsync(string compilationGameId)
+    {
+        try
+        {
+            var parts = compilationGameId.Split('_');
+            if (parts.Length >= 4)
+            {
+                var sessionId = string.Join('_', parts.Skip(3));
+                var httpClient = _httpClientFactory.CreateClient("LocalClient");
+                var response = await httpClient.GetAsync($"api/project/session/{sessionId}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var session = await response.Content.ReadFromJsonAsync<CompilationSession>();
+                    if (session != null && session.CompletedAt.HasValue)
+                    {
+                        IsCompiling = false;
+                        CompilationGameId = null;
+                        
+                        if (!session.Success)
+                        {
+                            CompilationError = session.ErrorMessage ?? "Compilation failed";
+                            if (!string.IsNullOrEmpty(session.Output))
+                            {
+                                CompilationError += "\n\nCompilation Output:\n" + session.Output;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Still compiling
+                        IsCompiling = true;
+                        CompilationGameId = compilationGameId;
+                        CompilationStatus = "Compiling";
+                    }
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Session not found, check if game files exist
+                    var gamePath = Path.Combine(Directory.GetCurrentDirectory(), "CompiledGames", compilationGameId);
+                    if (Directory.Exists(gamePath))
+                    {
+                        var indexFile = Path.Combine(gamePath, "index.html");
+                        if (System.IO.File.Exists(indexFile))
+                        {
+                            // Game is ready, redirect to GameRunner
+                            IsCompiling = false;
+                            CompilationGameId = null;
+                        }
+                        else
+                        {
+                            // Still compiling
+                            IsCompiling = true;
+                            CompilationGameId = compilationGameId;
+                            CompilationStatus = "Compiling";
+                        }
+                    }
+                    else
+                    {
+                        // Game not found
+                        IsCompiling = false;
+                        CompilationGameId = null;
+                        CompilationError = "Game not found. It may have expired or been removed.";
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking compilation status for game {GameId}", compilationGameId);
+            IsCompiling = false;
+            CompilationGameId = null;
+            CompilationError = $"Error checking compilation status: {ex.Message}";
+        }
     }
 
     private async Task LoadProjectAsync()
@@ -218,38 +330,54 @@ End Class";
         {
             var httpClient = _httpClientFactory.CreateClient("LocalClient");
 
-            // Update project with current code
             await UpdateProjectAsync();
 
-            // Compile the project using the enhanced compilation endpoint
-            var response = await httpClient.PostAsJsonAsync("api/monogame/compile-enhanced", new CompileRequest { ProjectId = ProjectId, UserId = UserId });
+            var sessionId = Guid.NewGuid().ToString();
+            var gameId = $"game_{UserId}_{ProjectId}_{sessionId}";
 
-            if (response.IsSuccessStatusCode)
+            _ = Task.Run(async () =>
             {
-                var result = await response.Content.ReadFromJsonAsync<CompilationResult>();
-                if (result?.Success == true)
+                try
                 {
-                    GameUrl = result.GameUrl;
-                    return RedirectToPage("/GameRunner", new { gameId = result.GameId });
+                    _logger.LogInformation("Sending compilation request for game {GameId}", gameId);
+                    var response = await httpClient.PostAsJsonAsync("api/monogame/compile-enhanced", new CompileRequest { ProjectId = ProjectId, UserId = UserId, SessionId = sessionId });
+                    
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogInformation("Compilation response for game {GameId}: Status={Status}, Content={Content}", 
+                        gameId, response.StatusCode, responseContent);
+                        
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        _logger.LogError("Compilation request failed for game {GameId}: {StatusCode} - {Content}", 
+                            gameId, response.StatusCode, responseContent);
+                    }
                 }
-                else
+                catch (TaskCanceledException ex)
                 {
-                    CompilationError = result?.ErrorMessage ?? "Unknown compilation error";
+                    _logger.LogError(ex, "Compilation request timed out for game {GameId}", gameId);
                 }
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                CompilationError = $"Compilation failed: {errorContent}";
-            }
+                catch (HttpRequestException ex)
+                {
+                    _logger.LogError(ex, "HTTP error during compilation for game {GameId}", gameId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error starting compilation for game {GameId}", gameId);
+                }
+            });
+
+            IsCompiling = true;
+            CompilationGameId = gameId;
+            CompilationStatus = "Initializing compilation...";
+            _logger.LogInformation("Compilation started, showing compiling message for game {GameId}", gameId);
+            return Page();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during compilation");
             CompilationError = $"Error during compilation: {ex.Message}";
+            return Page();
         }
-
-        return Page();
     }
 
     private async Task UpdateProjectAsync()
@@ -289,47 +417,50 @@ End Class";
             // Update project with current code
             await UpdateProjectAsync();
 
-            // Compile with new assets
-            using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(ProjectId.ToString()), "ProjectId");
-            content.Add(new StringContent(UserId.ToString()), "UserId");
-            content.Add(new StringContent(VbCode), "VbCode"); // Add VbCode explicitly
+            // Generate a unique session ID for this compilation
+            var sessionId = Guid.NewGuid().ToString();
+            var gameId = $"game_{UserId}_{ProjectId}_{sessionId}";
 
-            if (AssetFiles != null)
+            // Start compilation in background
+            _ = Task.Run(async () =>
             {
-                foreach (var file in AssetFiles)
+                try
                 {
-                    content.Add(new StreamContent(file.OpenReadStream()), file.FileName, file.FileName);
-                }
-            }
+                    using var content = new MultipartFormDataContent();
+                    content.Add(new StringContent(ProjectId.ToString()), "ProjectId");
+                    content.Add(new StringContent(UserId.ToString()), "UserId");
+                    content.Add(new StringContent(sessionId), "SessionId");
+                    content.Add(new StringContent(VbCode), "VbCode");
 
-            var response = await httpClient.PostAsync("api/monogame/compile-with-new-assets", content);
+                    if (AssetFiles != null)
+                    {
+                        foreach (var file in AssetFiles)
+                        {
+                            content.Add(new StreamContent(file.OpenReadStream()), file.FileName, file.FileName);
+                        }
+                    }
 
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadFromJsonAsync<CompilationResult>();
-                if (result?.Success == true)
-                {
-                    GameUrl = result.GameUrl;
-                    return RedirectToPage("/GameRunner", new { gameId = result.GameId });
+                    var response = await httpClient.PostAsync("api/monogame/compile-enhanced-with-assets", content);
+                    _logger.LogInformation("Compilation with assets started for game {GameId}, status: {Status}", gameId, response.StatusCode);
                 }
-                else
+                catch (Exception ex)
                 {
-                    CompilationError = result?.ErrorMessage ?? "Unknown compilation error";
+                    _logger.LogError(ex, "Error starting compilation with assets for game {GameId}", gameId);
                 }
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                CompilationError = $"Compilation failed: {errorContent}";
-            }
+            });
+
+            // Set compilation status and return to page
+            IsCompiling = true;
+            CompilationGameId = gameId;
+            CompilationStatus = "Compiling with assets";
+            _logger.LogInformation("Compilation with assets started, showing compiling message for game {GameId}", gameId);
+            return Page();
         }
         catch (Exception ex)
         {
             CompilationError = $"Error during compilation: {ex.Message}";
+            return Page();
         }
-
-        return Page();
     }
 }
 

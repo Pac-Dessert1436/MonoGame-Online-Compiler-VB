@@ -12,7 +12,7 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Game Runner</h5>
                     <div class="d-flex gap-2">
-                        <span class="badge bg-@(Model.GameStatus == "Ready" ? "success" : "warning")">
+                        <span class="badge bg-@(Model.GameStatus == "Ready" ? "success" : Model.GameStatus == "Compiling" ? "warning" : Model.GameStatus == "Failed" || Model.GameStatus == "Error" ? "danger" : "secondary")">
                             Status: @Model.GameStatus
                         </span>
                         <a asp-page="/VbCodeEditor" class="btn btn-sm btn-outline-primary">
@@ -92,7 +92,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const status = '@Model.GameStatus';
             
-            if (status !== 'Ready' && status !== 'NotFound') {
+            if (status !== 'Ready' && status !== 'NotFound' && status !== 'Failed' && status !== 'Error') {
                 // Check status every 3 seconds
                 refreshInterval = setInterval(checkGameStatus, 3000);
             }
@@ -100,18 +100,51 @@
 
         async function checkGameStatus() {
             try {
-                const response = await fetch(`/api/monogame/status/@Model.GameId`);
-                if (response.ok) {
-                    const result = await response.json();
+                // Extract sessionId from gameId
+                const gameId = '@Model.GameId';
+                const parts = gameId.split('_');
+                
+                if (parts.length >= 4) {
+                    const sessionId = parts.slice(3).join('_');
+                    const response = await fetch(`/api/project/session/${sessionId}`);
                     
-                    if (result.Status === 'Ready') {
-                        // Game is ready, reload the page
-                        clearInterval(refreshInterval);
-                        window.location.reload();
-                    } else if (result.Status === 'NotFound') {
-                        // Game not found
-                        clearInterval(refreshInterval);
-                        window.location.reload();
+                    if (response.ok) {
+                        const session = await response.json();
+                        
+                        if (session.completedAt) {
+                            // Compilation is complete
+                            clearInterval(refreshInterval);
+                            window.location.reload();
+                        }
+                        // If not completed, continue polling
+                    } else if (response.status === 404) {
+                        // Session not found, check game files
+                        const statusResponse = await fetch(`/api/monogame/status/${gameId}`);
+                        if (statusResponse.ok) {
+                            const statusResult = await statusResponse.json();
+                            
+                            if (statusResult.Status === 'Ready') {
+                                clearInterval(refreshInterval);
+                                window.location.reload();
+                            } else if (statusResult.Status === 'NotFound') {
+                                clearInterval(refreshInterval);
+                                window.location.reload();
+                            }
+                        }
+                    }
+                } else {
+                    // Fallback to old behavior for legacy gameIds
+                    const response = await fetch(`/api/monogame/status/${gameId}`);
+                    if (response.ok) {
+                        const result = await response.json();
+                        
+                        if (result.Status === 'Ready') {
+                            clearInterval(refreshInterval);
+                            window.location.reload();
+                        } else if (result.Status === 'NotFound') {
+                            clearInterval(refreshInterval);
+                            window.location.reload();
+                        }
                     }
                 }
             } catch (error) {

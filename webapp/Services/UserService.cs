@@ -204,10 +204,10 @@ public class UserService(AppDbContext context, ILogger<UserService> logger)
         return session;
     }
 
-    public async Task<CompilationSession?> UpdateCompilationSessionAsync(int sessionId, bool success, string? errorMessage = null, string? output = null, string? compiledGamePath = null)
+    public async Task<CompilationSession?> UpdateCompilationSessionAsync(string sessionId, bool success, string? errorMessage = null, string? output = null, string? compiledGamePath = null)
     {
         var session = await context.CompilationSessions
-            .FirstOrDefaultAsync(s => s.Id == sessionId);
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
         
         if (session == null)
         {
@@ -231,5 +231,12 @@ public class UserService(AppDbContext context, ILogger<UserService> logger)
             .OrderByDescending(s => s.StartedAt)
             .Take(limit)
             .ToListAsync();
+    }
+
+    public async Task<CompilationSession?> GetCompilationSessionAsync(string sessionId)
+    {
+        return await context.CompilationSessions
+            .Include(s => s.GameProject)
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId);
     }
 }

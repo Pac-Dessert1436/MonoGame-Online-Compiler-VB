@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using webapp.Models;
 
 namespace webapp.Pages;
 
@@ -28,28 +29,92 @@ public class GameRunnerModel : PageModel
         GameId = gameId;
         GameUrl = $"/games/{gameId}/index.html";
 
-        // Check game status
-        try
+        // Extract sessionId from gameId (format: game_{userId}_{projectId}_{sessionId})
+        var parts = gameId.Split('_');
+        if (parts.Length >= 4)
         {
-            var httpClient = _httpClientFactory.CreateClient("LocalClient");
-            var response = await httpClient.GetAsync($"api/monogame/status/{gameId}");
+            var sessionId = string.Join('_', parts.Skip(3));
             
-            if (response.IsSuccessStatusCode)
+            // Check compilation session status
+            try
             {
-                var statusResult = await response.Content.ReadFromJsonAsync<GameStatusResult>();
-                if (statusResult != null)
+                var httpClient = _httpClientFactory.CreateClient("LocalClient");
+                var response = await httpClient.GetAsync($"api/project/session/{sessionId}");
+                
+                if (response.IsSuccessStatusCode)
                 {
-                    GameStatus = statusResult.Status;
-                    if (statusResult.Status == "NotFound")
+                    var session = await response.Content.ReadFromJsonAsync<CompilationSession>();
+                    if (session != null)
                     {
+                        if (session.CompletedAt.HasValue)
+                        {
+                            if (session.Success)
+                            {
+                                GameStatus = "Ready";
+                            }
+                            else
+                            {
+                                GameStatus = "Failed";
+                                CompilationError = session.ErrorMessage ?? "Compilation failed";
+                                CompilationOutput = session.Output;
+                            }
+                        }
+                        else
+                        {
+                            GameStatus = "Compiling";
+                        }
+                    }
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Session not found, check if game files exist
+                    var gamePath = Path.Combine(Directory.GetCurrentDirectory(), "CompiledGames", gameId);
+                    if (Directory.Exists(gamePath))
+                    {
+                        var indexFile = Path.Combine(gamePath, "index.html");
+                        if (System.IO.File.Exists(indexFile))
+                        {
+                            GameStatus = "Ready";
+                        }
+                        else
+                        {
+                            GameStatus = "Compiling";
+                        }
+                    }
+                    else
+                    {
+                        GameStatus = "NotFound";
                         CompilationError = "Game not found. It may have expired or been removed.";
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                CompilationError = $"Error checking game status: {ex.Message}";
+                GameStatus = "Error";
+            }
         }
-        catch (Exception ex)
+        else
         {
-            CompilationError = $"Error checking game status: {ex.Message}";
+            // Fallback to old behavior for legacy gameIds
+            var gamePath = Path.Combine(Directory.GetCurrentDirectory(), "CompiledGames", gameId);
+            if (Directory.Exists(gamePath))
+            {
+                var indexFile = Path.Combine(gamePath, "index.html");
+                if (System.IO.File.Exists(indexFile))
+                {
+                    GameStatus = "Ready";
+                }
+                else
+                {
+                    GameStatus = "Compiling";
+                }
+            }
+            else
+            {
+                GameStatus = "NotFound";
+                CompilationError = "Game not found. It may have expired or been removed.";
+            }
         }
 
         return Page();

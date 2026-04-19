@@ -178,6 +178,25 @@ public class ProjectController(UserService userService, ILogger<ProjectControlle
             return StatusCode(500, "Failed to retrieve compilation history");
         }
     }
+
+    [HttpGet("session/{sessionId}")]
+    public async Task<ActionResult<CompilationSession>> GetCompilationSession(string sessionId)
+    {
+        try
+        {
+            var session = await userService.GetCompilationSessionAsync(sessionId);
+            if (session == null)
+            {
+                return NotFound("Compilation session not found");
+            }
+            return Ok(session);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting compilation session {SessionId}", sessionId);
+            return StatusCode(500, "Failed to retrieve compilation session");
+        }
+    }
 }
 
 public sealed class CreateProjectRequest

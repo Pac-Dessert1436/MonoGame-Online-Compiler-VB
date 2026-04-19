@@ -38,7 +38,7 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
             return BadRequest("Valid project ID and user ID are required");
         }
 
-        var sessionId = Guid.NewGuid().ToString();
+        var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
         var result = await compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId);
 
         if (result.Success)
@@ -86,7 +86,7 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
             return BadRequest("Valid project ID and user ID are required");
         }
 
-        var sessionId = Guid.NewGuid().ToString();
+        var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
         var newAssets = Request.Form.Files.ToList();
 
         var result = await compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId, newAssets);
@@ -144,6 +144,51 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
         {
             return StatusCode(500, "Cleanup failed");
         }
+    }
+
+    [HttpPost("cleanup-cache")]
+    public async Task<ActionResult> CleanupBuildCache([FromQuery] int hoursOld = 24)
+    {
+        var success = await compilerService.CleanupOldBuildCacheAsync(hoursOld);
+        if (success)
+        {
+            return Ok(new { Message = $"Build cache cleanup completed successfully. Removed cache entries older than {hoursOld} hours." });
+        }
+        else
+        {
+            return StatusCode(500, "Cache cleanup failed");
+        }
+    }
+
+    [HttpDelete("cache/{userId}/{projectId}")]
+    public ActionResult ClearProjectCache(int userId, int projectId)
+    {
+        var cachePath = Path.Combine(Path.GetTempPath(), "MonoGameBuildCache", $"{userId}_{projectId}");
+        
+        if (Directory.Exists(cachePath))
+        {
+            try
+            {
+                Directory.Delete(cachePath, true);
+                return Ok(new { Message = $"Cleared build cache for user {userId}, project {projectId}" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Failed to clear cache: {ex.Message}");
+            }
+        }
+        
+        return NotFound(new { Message = "Cache not found" });
+    }
+
+    [HttpGet("test")]
+    public ActionResult TestEndpoint()
+    {
+        return Ok(new { 
+            Message = "API is working", 
+            Timestamp = DateTime.UtcNow,
+            Environment = Environment.MachineName
+        });
     }
 }
 

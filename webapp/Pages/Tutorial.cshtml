@@ -615,19 +615,19 @@ End Class</code></pre>
     End Sub
     
     Protected Overrides Sub Update(gameTime As GameTime)
-        Dim keyboard As KeyboardState = Keyboard.GetState()
+        Dim keyState As KeyboardState = Keyboard.GetState()
         Dim deltaTime As Single = CSng(gameTime.ElapsedGameTime.TotalSeconds)
         
-        If keyboard.IsKeyDown(Keys.W) Then
+        If keyState.IsKeyDown(Keys.W) Then
             playerPos.Y -= speed * deltaTime
         End If
-        If keyboard.IsKeyDown(Keys.S) Then
+        If keyState.IsKeyDown(Keys.S) Then
             playerPos.Y += speed * deltaTime
         End If
-        If keyboard.IsKeyDown(Keys.A) Then
+        If keyState.IsKeyDown(Keys.A) Then
             playerPos.X -= speed * deltaTime
         End If
-        If keyboard.IsKeyDown(Keys.D) Then
+        If keyState.IsKeyDown(Keys.D) Then
             playerPos.X += speed * deltaTime
         End If
         
@@ -868,7 +868,6 @@ End Sub</code></pre>
         code[class*="language-"] {
         font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         text-shadow: none;
-        color: wheat;
         }
 
         .card-body pre {

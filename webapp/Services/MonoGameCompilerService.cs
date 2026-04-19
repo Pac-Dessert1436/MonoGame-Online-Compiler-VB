@@ -1,6 +1,6 @@
-using Microsoft.Build.Logging;
-using Microsoft.Build.Evaluation;
 using System.Diagnostics;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using webapp.Models;
 
 namespace webapp.Services;
@@ -12,8 +12,10 @@ public sealed class MonoGameCompilerService
     private readonly string _compiledGamesPath;
     private readonly string _tempBuildPath;
     private readonly string _userAssetsPath;
+    private readonly string _buildCachePath;
     private readonly UserService _userService;
     private readonly SemaphoreSlim _compilationSemaphore;
+    private readonly ConcurrentDictionary<string, string> _contentHashCache;
 
     public MonoGameCompilerService(ILogger<MonoGameCompilerService> logger, IConfiguration configuration, UserService userService)
     {
@@ -24,13 +26,15 @@ public sealed class MonoGameCompilerService
         _compiledGamesPath = Path.Combine(Directory.GetCurrentDirectory(), "CompiledGames");
         _tempBuildPath = Path.Combine(Path.GetTempPath(), "MonoGameBuilds");
         _userAssetsPath = Path.Combine(Directory.GetCurrentDirectory(), "UserAssets");
+        _buildCachePath = Path.Combine(Path.GetTempPath(), "MonoGameBuildCache");
         
-        _compilationSemaphore = new SemaphoreSlim(2); // Limit concurrent compilations to 2
+        _compilationSemaphore = new SemaphoreSlim(3);
+        _contentHashCache = new ConcurrentDictionary<string, string>();
         
-        // Ensure directories exist
         Directory.CreateDirectory(_compiledGamesPath);
         Directory.CreateDirectory(_tempBuildPath);
         Directory.CreateDirectory(_userAssetsPath);
+        Directory.CreateDirectory(_buildCachePath);
     }
 
     // Method 1: Simple compilation with just VB code (from original MonoGameCompilerService)
@@ -111,9 +115,13 @@ public sealed class MonoGameCompilerService
     // Method 2: Enhanced compilation with project/user tracking (from EnhancedMonoGameCompilerService)
     public async Task<CompilationResult> CompileGameAsync(int projectId, int userId, string sessionId, List<IFormFile>? newAssets = null)
     {
+        _logger.LogInformation("Starting compilation for ProjectId={ProjectId}, UserId={UserId}, SessionId={SessionId}", 
+            projectId, userId, sessionId);
+
         var dbSession = await _userService.CreateCompilationSessionAsync(projectId, userId, sessionId);
         if (dbSession == null)
         {
+            _logger.LogError("Failed to create compilation session for ProjectId={ProjectId}, UserId={UserId}", projectId, userId);
             return new CompilationResult
             {
                 Success = false,
@@ -121,12 +129,15 @@ public sealed class MonoGameCompilerService
             };
         }
 
+        _logger.LogInformation("Compilation session created with ID={SessionId}", dbSession.Id);
+
         await _compilationSemaphore.WaitAsync();
         try
         {
             var project = await _userService.GetGameProjectAsync(projectId, userId);
             if (project == null)
             {
+                _logger.LogError("Game project not found for ProjectId={ProjectId}, UserId={UserId}", projectId, userId);
                 return new CompilationResult
                 {
                     Success = false,
@@ -139,25 +150,50 @@ public sealed class MonoGameCompilerService
             var tempProjectPath = Path.Combine(_tempBuildPath, gameId);
             var userAssetPath = Path.Combine(_userAssetsPath, userId.ToString(), projectId.ToString());
 
+            _logger.LogInformation("Compilation paths set - GameId={GameId}, OutputPath={OutputPath}, TempPath={TempPath}", 
+                gameId, gameOutputPath, tempProjectPath);
+
             Directory.CreateDirectory(gameOutputPath);
             Directory.CreateDirectory(tempProjectPath);
             Directory.CreateDirectory(userAssetPath);
 
-            // Copy MonoGame project to temp location
-            await CopyMonoGameProjectAsync(tempProjectPath);
+            var codeHash = ComputeHash(project.VbCode);
+            var cacheKey = $"{userId}_{projectId}";
+            var cachedBuildPath = Path.Combine(_buildCachePath, cacheKey);
+            var cacheInfoPath = Path.Combine(cachedBuildPath, ".cacheinfo");
 
-            // Replace GameMain.vb with user code
+            bool useCachedBuild = false;
+            
+            if (Directory.Exists(cachedBuildPath) && File.Exists(cacheInfoPath))
+            {
+                var cachedHash = await File.ReadAllTextAsync(cacheInfoPath);
+                if (cachedHash == codeHash)
+                {
+                    useCachedBuild = true;
+                    _logger.LogInformation("Using cached build for user {UserId}, project {ProjectId}", userId, projectId);
+                }
+            }
+
+            await CopyMonoGameProjectOptimizedAsync(tempProjectPath);
             await UpdateGameMainAsync(tempProjectPath, project.VbCode);
-
-            // Handle existing and new assets
+            
+            if (useCachedBuild)
+            {
+                await RestoreBuildCacheAsync(cachedBuildPath, tempProjectPath);
+            }
+            
             await HandleAssetsAsync(tempProjectPath, userAssetPath, project.Assets, newAssets);
 
-            // Compile to WebAssembly
-            var compilationResult = await CompileToWebAssemblyAsync(tempProjectPath, gameOutputPath);
+            var compilationResult = await CompileToWebAssemblyOptimizedAsync(tempProjectPath, gameOutputPath, useCachedBuild);
 
             if (compilationResult.Success)
             {
-                await _userService.UpdateCompilationSessionAsync(dbSession.Id, true, null, compilationResult.Output, gameOutputPath);
+                if (!useCachedBuild)
+                {
+                    await UpdateBuildCacheAsync(cachedBuildPath, tempProjectPath, codeHash);
+                }
+                
+                await _userService.UpdateCompilationSessionAsync(dbSession.SessionId, true, null, compilationResult.Output, gameOutputPath);
                 
                 _logger.LogInformation("Successfully compiled game {GameId} for user {UserId}", gameId, userId);
                 return new CompilationResult
@@ -170,7 +206,7 @@ public sealed class MonoGameCompilerService
             }
             else
             {
-                await _userService.UpdateCompilationSessionAsync(dbSession.Id, false, compilationResult.ErrorMessage, compilationResult.Output);
+                await _userService.UpdateCompilationSessionAsync(dbSession.SessionId, false, compilationResult.ErrorMessage, compilationResult.Output);
                 
                 _logger.LogError("Failed to compile game {GameId} for user {UserId}: {Error}", gameId, userId, compilationResult.ErrorMessage);
                 return new CompilationResult
@@ -183,7 +219,7 @@ public sealed class MonoGameCompilerService
         }
         catch (Exception ex)
         {
-            await _userService.UpdateCompilationSessionAsync(dbSession.Id, false, $"Compilation error: {ex.Message}");
+            await _userService.UpdateCompilationSessionAsync(dbSession.SessionId, false, $"Compilation error: {ex.Message}");
             
             _logger.LogError(ex, "Error compiling game for user {UserId}, project {ProjectId}", userId, projectId);
             return new CompilationResult
@@ -196,7 +232,6 @@ public sealed class MonoGameCompilerService
         {
             _compilationSemaphore.Release();
             
-            // Cleanup temp directory
             var tempProjectPath = Path.Combine(_tempBuildPath, $"game_{userId}_{projectId}_{sessionId}");
             if (Directory.Exists(tempProjectPath))
             {
@@ -220,7 +255,6 @@ public sealed class MonoGameCompilerService
             throw new DirectoryNotFoundException($"MonoGame project not found at {_monoGameProjectPath}");
         }
 
-        // Copy all files except obj and bin directories
         foreach (var file in Directory.GetFiles(_monoGameProjectPath, "*", SearchOption.AllDirectories))
         {
             var relativePath = Path.GetRelativePath(_monoGameProjectPath, file);
@@ -234,6 +268,34 @@ public sealed class MonoGameCompilerService
 
             await Task.Run(() => File.Copy(file, targetFile, true));
         }
+    }
+
+    private async Task CopyMonoGameProjectOptimizedAsync(string targetPath)
+    {
+        if (!Directory.Exists(_monoGameProjectPath))
+        {
+            throw new DirectoryNotFoundException($"MonoGame project not found at {_monoGameProjectPath}");
+        }
+
+        var filesToCopy = Directory.GetFiles(_monoGameProjectPath, "*", SearchOption.AllDirectories)
+            .Where(f => !f.Contains("\\obj\\") && !f.Contains("\\bin\\"))
+            .ToList();
+
+        var copyTasks = filesToCopy.Select(async file =>
+        {
+            var relativePath = Path.GetRelativePath(_monoGameProjectPath, file);
+            var targetFile = Path.Combine(targetPath, relativePath);
+            
+            var targetDir = Path.GetDirectoryName(targetFile);
+            if (!Directory.Exists(targetDir))
+            {
+                Directory.CreateDirectory(targetDir!);
+            }
+
+            await Task.Run(() => File.Copy(file, targetFile, true));
+        });
+
+        await Task.WhenAll(copyTasks);
     }
 
     private static async Task UpdateGameMainAsync(string projectPath, string vbCode)
@@ -365,6 +427,168 @@ public sealed class MonoGameCompilerService
         };
     }
 
+    private async Task<CompilationResult> CompileToWebAssemblyOptimizedAsync(string projectPath, string outputPath, bool useCachedBuild)
+    {
+        var projectFile = Path.Combine(projectPath, "MonoGameVB.Wasm.vbproj");
+        var buildArgs = useCachedBuild 
+            ? $"publish \"{projectFile}\" -c Release -o \"{outputPath}\" --runtime browser-wasm /p:WasmBuildNative=true /p:IncrementalBuild=true"
+            : $"publish \"{projectFile}\" -c Release -o \"{outputPath}\" --runtime browser-wasm /p:WasmBuildNative=true";
+
+        _logger.LogInformation("Starting compilation with args: {Args}", buildArgs);
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = buildArgs,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = projectPath,
+            Environment = 
+            {
+                ["MSBUILDDISABLENODEREUSE"] = "1",
+                ["UseSharedCompilation"] = "false"
+            }
+        };
+
+        using var process = Process.Start(processInfo);
+        if (process != null)
+        {
+            _logger.LogInformation("Compilation process started with PID: {ProcessId}", process.Id);
+            
+            await process.WaitForExitAsync();
+            
+            var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+
+            _logger.LogInformation("Compilation process exited with code: {ExitCode}", process.ExitCode);
+            
+            if (!string.IsNullOrEmpty(output))
+            {
+                _logger.LogDebug("Compilation output: {Output}", output);
+            }
+            
+            if (!string.IsNullOrEmpty(error))
+            {
+                _logger.LogWarning("Compilation errors: {Error}", error);
+            }
+
+            if (process.ExitCode == 0)
+            {
+                _logger.LogInformation("Compilation completed successfully");
+                return new CompilationResult
+                {
+                    Success = true,
+                    Output = output
+                };
+            }
+            else
+            {
+                _logger.LogError("Compilation failed with exit code: {ExitCode}", process.ExitCode);
+                return new CompilationResult
+                {
+                    Success = false,
+                    ErrorMessage = error,
+                    Output = output
+                };
+            }
+        }
+
+        _logger.LogError("Failed to start compilation process");
+        return new CompilationResult
+        {
+            Success = false,
+            ErrorMessage = "Failed to start compilation process"
+        };
+    }
+
+    private static string ComputeHash(string input)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(input);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
+    }
+
+    private async Task RestoreBuildCacheAsync(string cachePath, string targetPath)
+    {
+        try
+        {
+            var cachedObjPath = Path.Combine(cachePath, "obj");
+            var targetObjPath = Path.Combine(targetPath, "obj", "Release");
+
+            if (Directory.Exists(cachedObjPath))
+            {
+                if (Directory.Exists(targetObjPath))
+                {
+                    Directory.Delete(targetObjPath, true);
+                }
+
+                Directory.CreateDirectory(targetObjPath);
+                DirectoryCopy(cachedObjPath, targetObjPath, true);
+                _logger.LogInformation("Restored build cache from {CachePath} to {TargetPath}", cachePath, targetPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to restore build cache");
+        }
+    }
+
+    private async Task UpdateBuildCacheAsync(string cachePath, string sourcePath, string codeHash)
+    {
+        try
+        {
+            if (Directory.Exists(cachePath))
+            {
+                Directory.Delete(cachePath, true);
+            }
+
+            Directory.CreateDirectory(cachePath);
+
+            var objPath = Path.Combine(sourcePath, "obj", "Release");
+            if (Directory.Exists(objPath))
+            {
+                var targetObjPath = Path.Combine(cachePath, "obj");
+                DirectoryCopy(objPath, targetObjPath, true);
+            }
+
+            await File.WriteAllTextAsync(Path.Combine(cachePath, ".cacheinfo"), codeHash);
+            _logger.LogInformation("Updated build cache at {CachePath}", cachePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update build cache");
+        }
+    }
+
+    private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
+    {
+        var dir = new DirectoryInfo(sourceDirName);
+        var dirs = dir.GetDirectories();
+
+        if (!Directory.Exists(destDirName))
+        {
+            Directory.CreateDirectory(destDirName);
+        }
+
+        var files = dir.GetFiles();
+        foreach (var file in files)
+        {
+            var tempPath = Path.Combine(destDirName, file.Name);
+            file.CopyTo(tempPath, true);
+        }
+
+        if (copySubDirs)
+        {
+            foreach (var subdir in dirs)
+            {
+                var tempPath = Path.Combine(destDirName, subdir.Name);
+                DirectoryCopy(subdir.FullName, tempPath, copySubDirs);
+            }
+        }
+    }
+
     public async Task<bool> CleanupOldCompiledGamesAsync(int daysOld = 7)
     {
         try
@@ -397,6 +621,42 @@ public sealed class MonoGameCompilerService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during cleanup of old compiled games");
+            return false;
+        }
+    }
+
+    public async Task<bool> CleanupOldBuildCacheAsync(int hoursOld = 24)
+    {
+        try
+        {
+            var cutoffDate = DateTime.UtcNow.AddHours(-hoursOld);
+            var directories = Directory.GetDirectories(_buildCachePath);
+            var deletedCount = 0;
+
+            foreach (var dir in directories)
+            {
+                var dirInfo = new DirectoryInfo(dir);
+                if (dirInfo.CreationTimeUtc < cutoffDate)
+                {
+                    try
+                    {
+                        Directory.Delete(dir, true);
+                        deletedCount++;
+                        _logger.LogInformation("Deleted old build cache directory: {Directory}", dir);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to delete build cache directory: {Directory}", dir);
+                    }
+                }
+            }
+
+            _logger.LogInformation("Build cache cleanup completed. Deleted {Count} old cache entries", deletedCount);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during cleanup of old build cache");
             return false;
         }
     }

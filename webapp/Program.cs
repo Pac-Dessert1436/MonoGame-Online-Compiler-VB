@@ -1,4 +1,5 @@
 using webapp.Services;
+using webapp.BackgroundServices;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +29,9 @@ builder.Services.AddHttpClient("LocalClient", client =>
 // Register services
 builder.Services.AddScoped<MonoGameCompilerService>();
 builder.Services.AddScoped<UserService>();
+
+// Register background services
+builder.Services.AddHostedService<CacheCleanupService>();
 
 // Configure CORS for development
 builder.Services.AddCors(options =>

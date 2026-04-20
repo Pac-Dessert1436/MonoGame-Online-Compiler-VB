@@ -223,10 +223,13 @@ End Class";
                                 CompilationError += "\n\nCompilation Output:\n" + session.Output;
                             }
                         }
+                        else
+                        {
+                            GameUrl = $"/GameRunner?gameId={compilationGameId}";
+                        }
                     }
                     else
                     {
-                        // Still compiling
                         IsCompiling = true;
                         CompilationGameId = compilationGameId;
                         CompilationStatus = "Compiling";
@@ -456,6 +459,38 @@ End Class";
             CompilationError = $"Error during compilation: {ex.Message}";
             return Page();
         }
+    }
+
+    public async Task<IActionResult> OnPostAbortAsync()
+    {
+        _logger.LogInformation("OnPostAbortAsync called for game {GameId}", CompilationGameId);
+
+        if (string.IsNullOrEmpty(CompilationGameId))
+        {
+            return Page();
+        }
+
+        try
+        {
+            var parts = CompilationGameId.Split('_');
+            if (parts.Length >= 4)
+            {
+                var sessionId = string.Join('_', parts.Skip(3));
+                var httpClient = _httpClientFactory.CreateClient("LocalClient");
+                await httpClient.PostAsync($"api/project/abort/{sessionId}", null);
+                _logger.LogInformation("Abort request sent for session {SessionId}", sessionId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error aborting compilation");
+        }
+
+        IsCompiling = false;
+        CompilationGameId = null;
+        CompilationError = "Compilation aborted by user";
+        
+        return Page();
     }
 }
 

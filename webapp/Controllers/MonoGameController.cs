@@ -1,31 +1,51 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using webapp.Services;
 
 namespace webapp.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class MonoGameController(MonoGameCompilerService compilerService) : ControllerBase
+public class MonoGameController(MonoGameCompilerService compilerService, ILogger<MonoGameController> logger) : ControllerBase
 {
     // Original simple compilation endpoint (from MonoGameController)
     [HttpPost("compile")]
     public async Task<ActionResult<CompilationResult>> CompileGame([FromBody] CompileRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.VbCode))
+        try
         {
-            return BadRequest("VB.NET code is required");
-        }
+            if (request == null)
+            {
+                logger.LogWarning("CompileGame: Request body is null");
+                return BadRequest("Request body is required");
+            }
+            
+            if (string.IsNullOrWhiteSpace(request.VbCode))
+            {
+                return BadRequest("VB.NET code is required");
+            }
 
-        var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
-        var result = await compilerService.CompileGameAsync(request.VbCode, sessionId);
+            var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
+            var result = await compilerService.CompileGameAsync(request.VbCode, sessionId);
 
-        if (result.Success)
-        {
-            return Ok(result);
+            if (result.Success)
+            {
+                return Ok(result);
+            }
+            else
+            {
+                return BadRequest(result);
+            }
         }
-        else
+        catch (JsonException jsonEx)
         {
-            return BadRequest(result);
+            logger.LogError(jsonEx, "JSON parsing error in CompileGame endpoint");
+            return BadRequest($"Invalid JSON format: {jsonEx.Message}");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error in CompileGame endpoint");
+            return StatusCode(500, $"Internal server error: {ex.Message}");
         }
     }
 
@@ -33,21 +53,40 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
     [HttpPost("compile-enhanced")]
     public async Task<ActionResult<CompilationResult>> CompileGameEnhanced([FromBody] CompileRequest request)
     {
-        if (request.ProjectId <= 0 || request.UserId <= 0)
+        try
         {
-            return BadRequest("Valid project ID and user ID are required");
-        }
+            if (request == null)
+            {
+                logger.LogWarning("CompileGameEnhanced: Request body is null");
+                return BadRequest("Request body is required");
+            }
+            
+            if (request.ProjectId <= 0 || request.UserId <= 0)
+            {
+                return BadRequest("Valid project ID and user ID are required");
+            }
 
-        var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
-        var result = await compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId);
+            var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
+            var result = await compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId);
 
-        if (result.Success)
-        {
-            return Ok(result);
+            if (result.Success)
+            {
+                return Ok(result);
+            }
+            else
+            {
+                return BadRequest(result);
+            }
         }
-        else
+        catch (JsonException jsonEx)
         {
-            return BadRequest(result);
+            logger.LogError(jsonEx, "JSON parsing error in CompileGameEnhanced endpoint");
+            return BadRequest($"Invalid JSON format: {jsonEx.Message}");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error in CompileGameEnhanced endpoint");
+            return StatusCode(500, $"Internal server error: {ex.Message}");
         }
     }
 
@@ -103,25 +142,55 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
 
     // Status and management endpoints
     [HttpGet("status/{gameId}")]
-    public ActionResult GetGameStatus(string gameId)
+    public ActionResult<CompilationStatusResult> GetCompilationStatus(string gameId)
     {
-        var gamePath = Path.Combine(Directory.GetCurrentDirectory(), "CompiledGames", gameId);
-        
-        if (Directory.Exists(gamePath))
+        try
         {
-            var indexFile = Path.Combine(gamePath, "index.html");
-            if (System.IO.File.Exists(indexFile))
+            var gamePath = Path.Combine(Directory.GetCurrentDirectory(), "CompiledGames", gameId);
+            
+            if (!Directory.Exists(gamePath))
             {
-                return Ok(new { GameId = gameId, Status = "Ready", GameUrl = $"/games/{gameId}/index.html" });
+                return Ok(new CompilationStatusResult
+                {
+                    Success = false,
+                    Status = "NotFound",
+                    Message = "Game compilation not found or still in progress"
+                });
+            }
+
+            // Check if the game is ready by looking for key files
+            var indexFile = Path.Combine(gamePath, "index.html");
+            var wasmFile = Path.Combine(gamePath, "dotnet.native.wasm");
+            
+            if (System.IO.File.Exists(indexFile) && System.IO.File.Exists(wasmFile))
+            {
+                return Ok(new CompilationStatusResult
+                {
+                    Success = true,
+                    Status = "Ready",
+                    GameId = gameId,
+                    Message = "Game compiled successfully and ready to run"
+                });
             }
             else
             {
-                return Ok(new { GameId = gameId, Status = "Compiling" });
+                return Ok(new CompilationStatusResult
+                {
+                    Success = false,
+                    Status = "InProgress",
+                    Message = "Game compilation still in progress"
+                });
             }
         }
-        else
+        catch (Exception ex)
         {
-            return NotFound(new { GameId = gameId, Status = "NotFound" });
+            logger.LogError(ex, "Error checking compilation status for game {GameId}", gameId);
+            return Ok(new CompilationStatusResult
+            {
+                Success = false,
+                Status = "Error",
+                Message = $"Error checking compilation status: {ex.Message}"
+            });
         }
     }
 
@@ -190,6 +259,15 @@ public class MonoGameController(MonoGameCompilerService compilerService) : Contr
             Environment = Environment.MachineName
         });
     }
+}
+
+// Compilation status result model
+public sealed class CompilationStatusResult
+{
+    public bool Success { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? GameId { get; set; }
+    public string Message { get; set; } = string.Empty;
 }
 
 // Compilation result model

@@ -14,7 +14,7 @@
                     <small class="text-muted">Edit GameMain.vb below (Program.vb stays at backend)</small>
                 </div>
                 <div class="card-body">
-                    <form method="post" asp-page-handler="Compile" id="compileForm">
+                    <form method="post" id="compileForm">
                         <input type="hidden" asp-for="ProjectId" />
                         <input type="hidden" asp-for="UserId" />
 
@@ -59,8 +59,8 @@
                         }
 
                         <div class="d-flex gap-2">
-                            <button type="submit" name="handler" value="Compile" class="btn btn-primary" onclick="return validateAndSubmit()">
-                                <i class="bi bi-play-fill"></i> Run Game
+                            <button id="compileButton" type="submit" name="handler" value="@((Model.IsCompiling) ? "Abort" : "Compile")" class="btn @((Model.IsCompiling) ? "btn-danger" : "btn-primary")" onclick="@((!Model.IsCompiling) ? "return validateAndSubmit()" : "")">
+                                <i id="compileButtonIcon" class="bi @((Model.IsCompiling) ? "bi-x-lg" : "bi-play-fill")"></i> <span id="compileButtonText">@((Model.IsCompiling) ? "Abort" : "Compile & Run")</span>
                             </button>
                             <button type="button" class="btn btn-secondary" onclick="resetCode()">
                                 <i class="bi bi-arrow-counterclockwise"></i> Reset to Scaffold
@@ -129,8 +129,8 @@
                     <ul class="small">
                         <li>Edit <code>GameMain.vb</code> in the left editor</li>
                         <li>Upload game assets (images, sounds) on the right</li>
-                        <li>Click "Run Game" to compile and play</li>
-                        <li>Compilation takes ~30-40 seconds</li>
+                        <li>Click "Compile & Run" to start compilation, "Abort" to cancel</li>
+                        <li>Compilation takes ~15-20 seconds</li>
                         <li>Syntax errors will be shown below the editor</li>
                         <li><code>Program.vb</code> is managed by the backend with fixed content:</li>
                     </ul>
@@ -303,20 +303,41 @@
         let compilationCheckInterval;
         let compilationStartTime;
         let compilationTimeout;
-        const expectedCompilationTime = 15000; // 15 seconds expected time
-        const maxCompilationTime = 120000; // 2 minutes maximum wait time
+        let currentPollingInterval = 3000; // Start with 3 seconds
+        const maxPollingInterval = 15000; // Max 15 seconds
+        const expectedCompilationTime = 30000; // 30 seconds expected time
+        const maxCompilationTime = 180000; // 3 minutes maximum wait time
         
         document.addEventListener('DOMContentLoaded', function() {
             const gameId = '@Model.CompilationGameId';
+            const gameUrl = '@Model.GameUrl';
             const isCompiling = '@Model.IsCompiling.ToString().ToLower()';
+            
+            // If GameUrl is set, redirect to GameRunner immediately
+            if (gameUrl && gameUrl.includes('GameRunner')) {
+                console.log('Compilation complete, redirecting to:', gameUrl);
+                setTimeout(() => {
+                    window.location.href = gameUrl;
+                }, 1000);
+                return;
+            }
             
             if (isCompiling === 'true' && gameId) {
                 compilationStartTime = Date.now();
                 compilationTimeout = setTimeout(handleCompilationTimeout, maxCompilationTime);
                 updateCompilationProgress();
-                compilationCheckInterval = setInterval(checkCompilationStatus, 2000); // Check every 2 seconds
+                
+                // Start with initial polling interval
+                checkCompilationStatus();
             }
         });
+        
+        function scheduleNextStatusCheck() {
+            // Exponential backoff - double the interval each time, up to max
+            currentPollingInterval = Math.min(currentPollingInterval * 1.5, maxPollingInterval);
+            compilationCheckInterval = setTimeout(checkCompilationStatus, currentPollingInterval);
+            console.log(`Scheduling next status check in ${currentPollingInterval}ms`);
+        }
 
         function handleCompilationTimeout() {
             clearInterval(compilationCheckInterval);
@@ -383,7 +404,7 @@
                         
                         if (session.completedAt) {
                             clearTimeout(compilationTimeout);
-                            clearInterval(compilationCheckInterval);
+                            clearTimeout(compilationCheckInterval);
                             
                             const progressBar = document.getElementById('compilationProgress');
                             const statusText = document.getElementById('compilationStatus');
@@ -413,6 +434,9 @@
                                     window.location.reload();
                                 }, 2000);
                             }
+                        } else {
+                            // Compilation still in progress, schedule next check with exponential backoff
+                            scheduleNextStatusCheck();
                         }
                     } else if (response.status === 404) {
                         console.log('Session not found, checking game status...');
@@ -421,9 +445,10 @@
                             const statusResult = await statusResponse.json();
                             console.log('Game status:', statusResult);
                             
-                            if (statusResult.Status === 'Ready') {
+                            // Check if compilation was successful based on the actual response structure
+                            if (statusResult.success === true || statusResult.Success === true) {
                                 clearTimeout(compilationTimeout);
-                                clearInterval(compilationCheckInterval);
+                                clearTimeout(compilationCheckInterval);
                                 
                                 const progressBar = document.getElementById('compilationProgress');
                                 const statusText = document.getElementById('compilationStatus');
@@ -439,12 +464,14 @@
                                     statusText.textContent = 'Compilation complete!';
                                 }
                                 
+                                // Use the gameId from the response or fall back to the current gameId
+                                const gameIdToUse = statusResult.gameId || statusResult.GameId || gameId;
                                 setTimeout(() => {
-                                    window.location.href = '/GameRunner?gameId=' + gameId;
+                                    window.location.href = '/GameRunner?gameId=' + gameIdToUse;
                                 }, 500);
-                            } else if (statusResult.Status === 'NotFound') {
+                            } else if (statusResult.success === false || statusResult.Success === false || statusResult.Status === 'NotFound') {
                                 clearTimeout(compilationTimeout);
-                                clearInterval(compilationCheckInterval);
+                                clearTimeout(compilationCheckInterval);
                                 
                                 const progressBar = document.getElementById('compilationProgress');
                                 const statusText = document.getElementById('compilationStatus');
@@ -463,13 +490,23 @@
                                 setTimeout(() => {
                                     window.location.reload();
                                 }, 2000);
+                            } else {
+                                // Status not determined, schedule next check
+                                scheduleNextStatusCheck();
                             }
+                        } else {
+                            // Status check failed, schedule next check
+                            scheduleNextStatusCheck();
                         }
                     } else {
                         console.error('Failed to check compilation session status:', response.status, response.statusText);
+                        // Schedule next check even if there's an error
+                        scheduleNextStatusCheck();
                     }
                 } catch (error) {
                     console.error('Error checking compilation status:', error);
+                    // Schedule next check even if there's an error
+                    scheduleNextStatusCheck();
                 }
             }
         }

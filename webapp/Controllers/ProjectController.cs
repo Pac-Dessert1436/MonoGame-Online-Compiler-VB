@@ -197,6 +197,25 @@ public class ProjectController(UserService userService, ILogger<ProjectControlle
             return StatusCode(500, "Failed to retrieve compilation session");
         }
     }
+
+    [HttpPost("abort/{sessionId}")]
+    public async Task<ActionResult> AbortCompilation(string sessionId)
+    {
+        try
+        {
+            var success = await userService.AbortCompilationAsync(sessionId);
+            if (!success)
+            {
+                return NotFound("Compilation session not found or already completed");
+            }
+            return Ok(new { Message = "Compilation aborted successfully" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error aborting compilation session {SessionId}", sessionId);
+            return StatusCode(500, "Failed to abort compilation");
+        }
+    }
 }
 
 public sealed class CreateProjectRequest

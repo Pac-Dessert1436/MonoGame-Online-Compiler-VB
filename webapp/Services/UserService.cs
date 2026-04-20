@@ -239,4 +239,24 @@ public class UserService(AppDbContext context, ILogger<UserService> logger)
             .Include(s => s.GameProject)
             .FirstOrDefaultAsync(s => s.SessionId == sessionId);
     }
+
+    public async Task<bool> AbortCompilationAsync(string sessionId)
+    {
+        var session = await context.CompilationSessions
+            .FirstOrDefaultAsync(s => s.SessionId == sessionId && s.CompletedAt == null);
+        
+        if (session == null)
+        {
+            return false;
+        }
+
+        session.Success = false;
+        session.ErrorMessage = "Compilation aborted by user";
+        session.CompletedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+        
+        logger.LogInformation("Compilation session aborted: {SessionId}", sessionId);
+        return true;
+    }
 }

@@ -84,7 +84,7 @@ public class ProjectManagerModel(IHttpClientFactory httpClientFactory, ILogger<P
             {
                 UserId, 
                 Name = ProjectName, 
-                VbCode = string.IsNullOrWhiteSpace(InitialCode) ? ScaffoldCode : InitialCode 
+                VbCode = string.IsNullOrWhiteSpace(InitialCode) ? VbCodeEditorModel.ScaffoldCode : InitialCode 
             });
 
             if (response.IsSuccessStatusCode)
@@ -155,60 +155,6 @@ public class ProjectManagerModel(IHttpClientFactory httpClientFactory, ILogger<P
         await LoadProjectsAsync();
         return Page();
     }
-
-    internal const string ScaffoldCode = @"
-Imports Microsoft.Xna.Framework
-Imports Microsoft.Xna.Framework.Graphics
-Imports Microsoft.Xna.Framework.Input
-
-Public Class GameMain
-    Inherits Game
-
-    Private ReadOnly _graphics As GraphicsDeviceManager
-    Private _spriteBatch As SpriteBatch
-    Private _position As Vector2 = New Vector2(100.0F, 100.0F)
-    Private _speed As Single = 200.0F
-
-    Public Sub New()
-        _graphics = New GraphicsDeviceManager(Me)
-        Content.RootDirectory = ""Content""
-        IsMouseVisible = True
-    End Sub
-
-    Protected Overrides Sub LoadContent()
-        _spriteBatch = New SpriteBatch(GraphicsDevice)
-    End Sub
-
-    Protected Overrides Sub Update(gameTime As GameTime)
-        Dim keyboard As KeyboardState = Keyboard.GetState()
-        Dim deltaTime As Single = CSng(gameTime.ElapsedGameTime.TotalSeconds)
-
-        If keyboard.IsKeyDown(Keys.W) Then
-            _position.Y -= _speed * deltaTime
-        End If
-        If keyboard.IsKeyDown(Keys.S) Then
-            _position.Y += _speed * deltaTime
-        End If
-        If keyboard.IsKeyDown(Keys.A) Then
-            _position.X -= _speed * deltaTime
-        End If
-        If keyboard.IsKeyDown(Keys.D) Then
-            _position.X += _speed * deltaTime
-        End If
-
-        MyBase.Update(gameTime)
-    End Sub
-
-    Protected Overrides Sub Draw(gameTime As GameTime)
-        GraphicsDevice.Clear(Color.CornflowerBlue)
-
-        _spriteBatch.Begin()
-        ' Draw your game elements here
-        _spriteBatch.End()
-
-        MyBase.Draw(gameTime)
-    End Sub
-End Class";
 }
 
 public class GameProject

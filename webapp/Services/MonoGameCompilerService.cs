@@ -16,6 +16,7 @@ public sealed class MonoGameCompilerService
     private readonly UserService _userService;
     private readonly SemaphoreSlim _compilationSemaphore;
     private readonly ConcurrentDictionary<string, string> _contentHashCache;
+    private readonly object _compilationLock = new();
 
     public MonoGameCompilerService(ILogger<MonoGameCompilerService> logger, IConfiguration configuration, UserService userService)
     {
@@ -35,6 +36,9 @@ public sealed class MonoGameCompilerService
         Directory.CreateDirectory(_tempBuildPath);
         Directory.CreateDirectory(_userAssetsPath);
         Directory.CreateDirectory(_buildCachePath);
+        
+        // Clean up any stuck compilation processes on startup
+        Task.Run(async () => await CleanupStuckCompilationsAsync());
     }
 
     // Method 1: Simple compilation with just VB code (from original MonoGameCompilerService)
@@ -61,6 +65,16 @@ public sealed class MonoGameCompilerService
                 await HandleAssetsAsync(tempProjectPath, assets);
             }
 
+            // Check VB.NET code for syntax errors
+            _logger.LogInformation("Checking VB.NET code for syntax errors");
+            var syntaxCheckResult = await CheckVbNetSyntaxAsync(tempProjectPath);
+            if (!syntaxCheckResult.Success)
+            {
+                _logger.LogError("VB.NET syntax check failed: {Error}", syntaxCheckResult.ErrorMessage);
+                return syntaxCheckResult;
+            }
+
+            _logger.LogInformation("VB.NET syntax check passed, starting WebAssembly compilation");
             // Compile to WebAssembly
             var compilationResult = await CompileToWebAssemblyAsync(tempProjectPath, gameOutputPath);
 
@@ -131,9 +145,24 @@ public sealed class MonoGameCompilerService
 
         _logger.LogInformation("Compilation session created with ID={SessionId}", dbSession.Id);
 
-        await _compilationSemaphore.WaitAsync();
+        // Add timeout to prevent infinite blocking
+        bool semaphoreAcquired = false;
         try
         {
+            semaphoreAcquired = await _compilationSemaphore.WaitAsync(TimeSpan.FromMinutes(5));
+            if (!semaphoreAcquired)
+            {
+                _logger.LogError("Failed to acquire compilation semaphore for ProjectId={ProjectId}, UserId={UserId}", projectId, userId);
+                await _userService.UpdateCompilationSessionAsync(dbSession.SessionId, false, "Compilation timeout - could not acquire compilation slot");
+                return new CompilationResult
+                {
+                    Success = false,
+                    ErrorMessage = "Compilation timeout - all compilation slots are busy. Please try again later."
+                };
+            }
+
+            _logger.LogInformation("Acquired compilation semaphore for ProjectId={ProjectId}, UserId={UserId}", projectId, userId);
+
             var project = await _userService.GetGameProjectAsync(projectId, userId);
             if (project == null)
             {
@@ -144,6 +173,8 @@ public sealed class MonoGameCompilerService
                     ErrorMessage = "Game project not found"
                 };
             }
+
+            _logger.LogInformation("Project loaded successfully for ProjectId={ProjectId}", projectId);
 
             var gameId = $"game_{userId}_{projectId}_{sessionId}";
             var gameOutputPath = Path.Combine(_compiledGamesPath, gameId);
@@ -156,6 +187,8 @@ public sealed class MonoGameCompilerService
             Directory.CreateDirectory(gameOutputPath);
             Directory.CreateDirectory(tempProjectPath);
             Directory.CreateDirectory(userAssetPath);
+
+            _logger.LogInformation("Directories created, starting cache check");
 
             var codeHash = ComputeHash(project.VbCode);
             var cacheKey = $"{userId}_{projectId}";
@@ -174,16 +207,31 @@ public sealed class MonoGameCompilerService
                 }
             }
 
+            _logger.LogInformation("Copying MonoGame project to temp directory");
             await CopyMonoGameProjectOptimizedAsync(tempProjectPath);
+            
+            _logger.LogInformation("Updating GameMain.vb with user code");
             await UpdateGameMainAsync(tempProjectPath, project.VbCode);
             
             if (useCachedBuild)
             {
+                _logger.LogInformation("Restoring build cache");
                 await RestoreBuildCacheAsync(cachedBuildPath, tempProjectPath);
             }
             
+            _logger.LogInformation("Handling assets");
             await HandleAssetsAsync(tempProjectPath, userAssetPath, project.Assets, newAssets);
 
+            _logger.LogInformation("Checking VB.NET code for syntax errors");
+            var syntaxCheckResult = await CheckVbNetSyntaxAsync(tempProjectPath);
+            if (!syntaxCheckResult.Success)
+            {
+                _logger.LogError("VB.NET syntax check failed: {Error}", syntaxCheckResult.ErrorMessage);
+                await _userService.UpdateCompilationSessionAsync(dbSession.SessionId, false, syntaxCheckResult.ErrorMessage, syntaxCheckResult.Output);
+                return syntaxCheckResult;
+            }
+
+            _logger.LogInformation("VB.NET syntax check passed, starting WebAssembly compilation");
             var compilationResult = await CompileToWebAssemblyOptimizedAsync(tempProjectPath, gameOutputPath, useCachedBuild);
 
             if (compilationResult.Success)
@@ -230,7 +278,12 @@ public sealed class MonoGameCompilerService
         }
         finally
         {
-            _compilationSemaphore.Release();
+            // Only release semaphore if it was actually acquired
+            if (semaphoreAcquired)
+            {
+                _compilationSemaphore.Release();
+                _logger.LogInformation("Released compilation semaphore for ProjectId={ProjectId}, UserId={UserId}", projectId, userId);
+            }
             
             var tempProjectPath = Path.Combine(_tempBuildPath, $"game_{userId}_{projectId}_{sessionId}");
             if (Directory.Exists(tempProjectPath))
@@ -272,14 +325,21 @@ public sealed class MonoGameCompilerService
 
     private async Task CopyMonoGameProjectOptimizedAsync(string targetPath)
     {
+        _logger.LogInformation("Checking MonoGame project path: {Path}", _monoGameProjectPath);
+        
         if (!Directory.Exists(_monoGameProjectPath))
         {
+            _logger.LogError("MonoGame project not found at {Path}", _monoGameProjectPath);
             throw new DirectoryNotFoundException($"MonoGame project not found at {_monoGameProjectPath}");
         }
+
+        _logger.LogInformation("Found MonoGame project, starting file copy");
 
         var filesToCopy = Directory.GetFiles(_monoGameProjectPath, "*", SearchOption.AllDirectories)
             .Where(f => !f.Contains("\\obj\\") && !f.Contains("\\bin\\"))
             .ToList();
+
+        _logger.LogInformation("Found {FileCount} files to copy", filesToCopy.Count);
 
         var copyTasks = filesToCopy.Select(async file =>
         {
@@ -296,6 +356,7 @@ public sealed class MonoGameCompilerService
         });
 
         await Task.WhenAll(copyTasks);
+        _logger.LogInformation("File copy completed successfully");
     }
 
     private static async Task UpdateGameMainAsync(string projectPath, string vbCode)
@@ -355,10 +416,20 @@ public sealed class MonoGameCompilerService
     private async Task RunMGCBAsync(string projectPath)
     {
         var mgcbPath = Path.Combine(projectPath, "Content", "Content.mgcb");
+        
+        // Skip MGCB if it's not installed or if the file doesn't exist
+        if (!File.Exists(mgcbPath))
+        {
+            _logger.LogInformation("MGCB file not found, skipping content build");
+            return;
+        }
+        
+        _logger.LogInformation("Starting MGCB content build");
+        
         var processInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"mgcb-editor \"{mgcbPath}\" /rebuild",
+            Arguments = $"mgcb \"{mgcbPath}\" /rebuild", // Use mgcb instead of mgcb-editor
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -369,19 +440,134 @@ public sealed class MonoGameCompilerService
         using var process = Process.Start(processInfo);
         if (process != null)
         {
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
-            
-            await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync());
-            
-            var output = await outputTask;
-            var error = await errorTask;
-            
-            if (process.ExitCode != 0)
+            try
             {
-                _logger.LogWarning("MGCB build completed with warnings: {Error}", error);
+                // Add timeout to prevent hanging
+                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(2));
+                var exitTask = process.WaitForExitAsync();
+                
+                var completedTask = await Task.WhenAny(exitTask, timeoutTask);
+                
+                if (completedTask == timeoutTask)
+                {
+                    _logger.LogWarning("MGCB build timed out after 2 minutes");
+                    process.Kill();
+                    return;
+                }
+                
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+                
+                if (process.ExitCode != 0)
+                {
+                    _logger.LogWarning("MGCB build completed with warnings: {Error}", error);
+                }
+                else
+                {
+                    _logger.LogInformation("MGCB build completed successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error running MGCB");
             }
         }
+        else
+        {
+            _logger.LogWarning("Failed to start MGCB process");
+        }
+    }
+
+    private async Task<CompilationResult> CheckVbNetSyntaxAsync(string projectPath)
+    {
+        var projectFile = Path.Combine(projectPath, "MonoGameVB.Wasm.vbproj");
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = $"build \"{projectFile}\" -c Release /p:SkipWasmBuild=true",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = projectPath
+        };
+
+        using var process = Process.Start(processInfo);
+        if (process != null)
+        {
+            try
+            {
+                // Add timeout to prevent hanging
+                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(2));
+                var exitTask = process.WaitForExitAsync();
+                
+                var completedTask = await Task.WhenAny(exitTask, timeoutTask);
+                
+                if (completedTask == timeoutTask)
+                {
+                    _logger.LogWarning("VB.NET syntax check timed out");
+                    process.Kill();
+                    return new CompilationResult
+                    {
+                        Success = false,
+                        ErrorMessage = "VB.NET syntax check timed out"
+                    };
+                }
+                
+                var output = await process.StandardOutput.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync();
+
+                if (process.ExitCode == 0)
+                {
+                    return new CompilationResult
+                    {
+                        Success = true,
+                        Output = output
+                    };
+                }
+                else
+                {
+                    // Extract only the VB.NET compilation errors, not build warnings
+                    var errorMessage = ExtractVbNetErrors(error);
+                    return new CompilationResult
+                    {
+                        Success = false,
+                        ErrorMessage = errorMessage,
+                        Output = output
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during VB.NET syntax check");
+                return new CompilationResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Syntax check error: {ex.Message}"
+                };
+            }
+        }
+
+        return new CompilationResult
+        {
+            Success = false,
+            ErrorMessage = "Failed to start syntax check process"
+        };
+    }
+
+    private string ExtractVbNetErrors(string errorOutput)
+    {
+        if (string.IsNullOrEmpty(errorOutput))
+            return "Unknown compilation error";
+
+        // Extract lines that contain VB.NET error codes (BC followed by numbers)
+        var lines = errorOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var errorLines = lines.Where(line => line.Contains("error BC")).ToList();
+
+        if (errorLines.Count == 0)
+            return errorOutput; // Return the whole output if no specific error codes found
+
+        return string.Join("\n", errorLines);
     }
 
     private async Task<CompilationResult> CompileToWebAssemblyAsync(string projectPath, string outputPath)
@@ -438,11 +624,13 @@ public sealed class MonoGameCompilerService
     private async Task<CompilationResult> CompileToWebAssemblyOptimizedAsync(string projectPath, string outputPath, bool useCachedBuild)
     {
         var projectFile = Path.Combine(projectPath, "MonoGameVB.Wasm.vbproj");
+        
+        // Optimized build arguments for faster compilation
         var buildArgs = useCachedBuild 
-            ? $"publish \"{projectFile}\" -c Release -o \"{outputPath}\" --runtime browser-wasm /p:WasmBuildNative=true /p:IncrementalBuild=true"
-            : $"publish \"{projectFile}\" -c Release -o \"{outputPath}\" --runtime browser-wasm /p:WasmBuildNative=true";
+            ? $"publish \"{projectFile}\" -c Release -o \"{outputPath}\" --runtime browser-wasm /p:WasmBuildNative=true /p:IncrementalBuild=true /p:UseSharedCompilation=false /p:BuildInParallel=true"
+            : $"publish \"{projectFile}\" -c Release -o \"{outputPath}\" --runtime browser-wasm /p:WasmBuildNative=true /p:UseSharedCompilation=false /p:BuildInParallel=true /p:Deterministic=false /p:Optimize=true";
 
-        _logger.LogInformation("Starting compilation with args: {Args}", buildArgs);
+        _logger.LogInformation("Starting optimized compilation with args: {Args}", buildArgs);
 
         var processInfo = new ProcessStartInfo
         {
@@ -456,7 +644,9 @@ public sealed class MonoGameCompilerService
             Environment = 
             {
                 ["MSBUILDDISABLENODEREUSE"] = "1",
-                ["UseSharedCompilation"] = "false"
+                ["UseSharedCompilation"] = "false",
+                ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
+                ["DOTNET_NOLOGO"] = "1"
             }
         };
 
@@ -465,43 +655,72 @@ public sealed class MonoGameCompilerService
         {
             _logger.LogInformation("Compilation process started with PID: {ProcessId}", process.Id);
             
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
-            
-            await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync());
-            
-            var output = await outputTask;
-            var error = await errorTask;
-
-            _logger.LogInformation("Compilation process exited with code: {ExitCode}", process.ExitCode);
-            
-            if (!string.IsNullOrEmpty(output))
+            try
             {
-                _logger.LogDebug("Compilation output: {Output}", output);
-            }
-            
-            if (!string.IsNullOrEmpty(error))
-            {
-                _logger.LogWarning("Compilation errors: {Error}", error);
-            }
-
-            if (process.ExitCode == 0)
-            {
-                _logger.LogInformation("Compilation completed successfully");
-                return new CompilationResult
+                // Add timeout to prevent hanging
+                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5));
+                var exitTask = process.WaitForExitAsync();
+                
+                var completedTask = await Task.WhenAny(exitTask, timeoutTask);
+                
+                if (completedTask == timeoutTask)
                 {
-                    Success = true,
-                    Output = output
-                };
+                    _logger.LogError("Compilation process timed out after 5 minutes");
+                    process.Kill();
+                    return new CompilationResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Compilation timed out after 5 minutes. Please check your code and try again."
+                    };
+                }
+                
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+                
+                await Task.WhenAll(outputTask, errorTask);
+                
+                var output = await outputTask;
+                var error = await errorTask;
+
+                _logger.LogInformation("Compilation process exited with code: {ExitCode}", process.ExitCode);
+                
+                if (!string.IsNullOrEmpty(output))
+                {
+                    _logger.LogDebug("Compilation output: {Output}", output);
+                }
+                
+                if (!string.IsNullOrEmpty(error))
+                {
+                    _logger.LogWarning("Compilation errors: {Error}", error);
+                }
+
+                if (process.ExitCode == 0)
+                {
+                    _logger.LogInformation("Compilation completed successfully");
+                    return new CompilationResult
+                    {
+                        Success = true,
+                        Output = output
+                    };
+                }
+                else
+                {
+                    _logger.LogError("Compilation failed with exit code: {ExitCode}", process.ExitCode);
+                    return new CompilationResult
+                    {
+                        Success = false,
+                        ErrorMessage = error,
+                        Output = output
+                    };
+                }
             }
-            else
+            catch (Exception ex)
             {
-                _logger.LogError("Compilation failed with exit code: {ExitCode}", process.ExitCode);
+                _logger.LogError(ex, "Error during compilation process");
                 return new CompilationResult
                 {
                     Success = false,
-                    ErrorMessage = error,
-                    Output = output
+                    ErrorMessage = $"Compilation error: {ex.Message}"
                 };
             }
         }
@@ -694,6 +913,43 @@ public sealed class MonoGameCompilerService
         }
 
         return result;
+    }
+
+    private async Task CleanupStuckCompilationsAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Starting cleanup of stuck compilations");
+            
+            // Clean up temp build directories that are older than 1 hour
+            var cutoffDate = DateTime.UtcNow.AddHours(-1);
+            var tempDirectories = Directory.GetDirectories(_tempBuildPath);
+            var cleanedCount = 0;
+
+            foreach (var dir in tempDirectories)
+            {
+                try
+                {
+                    var dirInfo = new DirectoryInfo(dir);
+                    if (dirInfo.CreationTimeUtc < cutoffDate)
+                    {
+                        Directory.Delete(dir, true);
+                        cleanedCount++;
+                        _logger.LogInformation("Deleted stuck temp build directory: {Directory}", dir);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete temp directory: {Directory}", dir);
+                }
+            }
+
+            _logger.LogInformation("Stuck compilation cleanup completed. Cleaned {Count} directories", cleanedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during cleanup of stuck compilations");
+        }
     }
 }
 

@@ -369,9 +369,13 @@ public sealed class MonoGameCompilerService
         using var process = Process.Start(processInfo);
         if (process != null)
         {
-            await process.WaitForExitAsync();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            
+            await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync());
+            
+            var output = await outputTask;
+            var error = await errorTask;
             
             if (process.ExitCode != 0)
             {
@@ -397,9 +401,13 @@ public sealed class MonoGameCompilerService
         using var process = Process.Start(processInfo);
         if (process != null)
         {
-            await process.WaitForExitAsync();
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            
+            await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync());
+            
+            var output = await outputTask;
+            var error = await errorTask;
 
             if (process.ExitCode == 0)
             {
@@ -457,10 +465,13 @@ public sealed class MonoGameCompilerService
         {
             _logger.LogInformation("Compilation process started with PID: {ProcessId}", process.Id);
             
-            await process.WaitForExitAsync();
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
             
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
+            await Task.WhenAll(outputTask, errorTask, process.WaitForExitAsync());
+            
+            var output = await outputTask;
+            var error = await errorTask;
 
             _logger.LogInformation("Compilation process exited with code: {ExitCode}", process.ExitCode);
             

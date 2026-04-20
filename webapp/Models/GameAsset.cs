@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace webapp.Models;
 public sealed class GameAsset
@@ -18,5 +19,6 @@ public sealed class GameAsset
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     
     public int GameProjectId { get; set; }
+    [JsonIgnore]
     public GameProject GameProject { get; set; } = null!;
 }

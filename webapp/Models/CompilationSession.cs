@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace webapp.Models;
 
@@ -19,5 +20,6 @@ public sealed class CompilationSession
     public string? CompiledGamePath { get; set; }
     
     public int GameProjectId { get; set; }
+    [JsonIgnore]
     public GameProject GameProject { get; set; } = null!;
 }

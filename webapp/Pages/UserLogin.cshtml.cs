@@ -18,9 +18,6 @@ public partial class UserLoginModel(IHttpClientFactory httpClientFactory, ILogge
     {
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} logged in successfully")]
-    partial void LogUserLogin(string username);
-
     public async Task<IActionResult> OnPostLoginAsync()
     {
         if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
@@ -41,7 +38,7 @@ public partial class UserLoginModel(IHttpClientFactory httpClientFactory, ILogge
                 {
                     HttpContext.Session.SetInt32("UserId", result.UserId);
                     HttpContext.Session.SetString("Username", result.Username);
-                    LogUserLogin(result.Username);
+                    logger.LogInformation("User {Username} logged in successfully", result.Username);
                     return RedirectToPage("/ProjectManager");
                 }
                 else

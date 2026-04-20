@@ -5,6 +5,9 @@ namespace webapp.Pages;
 
 public partial class UserRegisterModel(IHttpClientFactory httpClientFactory, ILogger<UserRegisterModel> logger) : PageModel
 {
+    //private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<UserRegisterModel> _logger = logger;
+
     [BindProperty]
     public string Username { get; set; } = string.Empty;
 
@@ -23,9 +26,6 @@ public partial class UserRegisterModel(IHttpClientFactory httpClientFactory, ILo
     public void OnGet()
     {
     }
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "New user {Username} registered successfully")]
-    partial void LogNewUserRegister(string username);
 
     public async Task<IActionResult> OnPostRegisterAsync()
     {
@@ -59,7 +59,7 @@ public partial class UserRegisterModel(IHttpClientFactory httpClientFactory, ILo
                 if (result?.Success == true)
                 {
                     SuccessMessage = "Registration successful! Please login.";
-                    LogNewUserRegister(Username);
+                    _logger.LogInformation("New user {Username} registered successfully", Username);
                     return RedirectToPage("/UserLogin", new { message = "Registration successful! Please login." });
                 }
                 else
@@ -75,7 +75,7 @@ public partial class UserRegisterModel(IHttpClientFactory httpClientFactory, ILo
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error during registration");
+            _logger.LogError(ex, "Error during registration");
             ErrorMessage = "An error occurred during registration. Please try again.";
         }
 

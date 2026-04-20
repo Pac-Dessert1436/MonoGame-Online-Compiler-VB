@@ -303,20 +303,15 @@ End Class";
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "VbCode length: {Length}")]
-    partial void LogVbCodeLength(int length);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "VbCode content preview: {Preview}")]
-    partial void LogVbCodeContentPreview(string preview);
-
     public async Task<IActionResult> OnPostCompileAsync()
     {
         _logger.LogInformation("OnPostCompileAsync called");
-        LogVbCodeLength(VbCode?.Length ?? 0);
+        _logger.LogInformation("VbCode length: {Length}", VbCode?.Length ?? 0);
 
         if (!string.IsNullOrEmpty(VbCode))
         {
-            LogVbCodeContentPreview(VbCode[..Math.Min(100, VbCode.Length)]);
+            var preview = VbCode.Length > 100 ? VbCode[..100] : VbCode;
+            _logger.LogInformation("VbCode content preview: {Preview}", preview);
         }
 
         if (string.IsNullOrWhiteSpace(VbCode))
@@ -401,7 +396,7 @@ End Class";
     public async Task<IActionResult> OnPostCompileWithAssetsAsync()
     {
         _logger.LogInformation("OnPostCompileWithAssetsAsync called");
-        LogVbCodeLength(VbCode?.Length ?? 0);
+        _logger.LogInformation("VbCode length: {Length}", VbCode?.Length ?? 0);
 
         if (string.IsNullOrWhiteSpace(VbCode))
         {

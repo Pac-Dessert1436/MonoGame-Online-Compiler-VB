@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace webapp.Models;
 
@@ -17,8 +18,11 @@ public sealed class GameProject
     public DateTime? UpdatedAt { get; set; }
     
     public int UserId { get; set; }
+    [JsonIgnore]
     public User User { get; set; } = null!;
     
+    [JsonIgnore]
     public ICollection<GameAsset> Assets { get; set; } = [];
+    [JsonIgnore]
     public ICollection<CompilationSession> CompilationSessions { get; set; } = [];
 }

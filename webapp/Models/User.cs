@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace webapp.Models;
 
@@ -20,5 +21,6 @@ public sealed class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
     
+    [JsonIgnore]
     public ICollection<GameProject> GameProjects { get; set; } = [];
 }

@@ -76,9 +76,8 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/games"
 });
 
-app.MapStaticAssets();
-app.MapRazorPages()
-   .WithStaticAssets();
+app.UseStaticFiles();
+app.MapRazorPages();
 
 app.MapControllers();
 

@@ -15,7 +15,7 @@ public sealed class CompiledGameLruCache
     private const int MaxCapacity = 5;
     private readonly ConcurrentDictionary<string, LinkedListNode<LruCacheItem>> _cache;
     private readonly LinkedList<LruCacheItem> _linkedList;
-    private readonly Lock _lock = new();
+    private readonly object _lock = new();
     private readonly string _compiledGamesPath;
     private readonly ILogger<CompiledGameLruCache> _logger;
 

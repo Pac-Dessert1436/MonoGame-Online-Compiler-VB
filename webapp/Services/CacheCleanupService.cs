@@ -1,11 +1,7 @@
-using webapp.Services;
+namespace webapp.Services;
 
-namespace webapp.BackgroundServices;
-
-public class CacheCleanupService(
-    ILogger<CacheCleanupService> logger,
-    IServiceScopeFactory scopeFactory,
-    IConfiguration configuration) : BackgroundService
+public class CacheCleanupService(ILogger<CacheCleanupService> logger,
+    IServiceScopeFactory scopeFactory, IConfiguration configuration) : BackgroundService
 {
     private readonly ILogger<CacheCleanupService> _logger = logger;
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory;

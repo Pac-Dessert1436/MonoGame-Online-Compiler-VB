@@ -1,5 +1,4 @@
 using webapp.Services;
-using webapp.BackgroundServices;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

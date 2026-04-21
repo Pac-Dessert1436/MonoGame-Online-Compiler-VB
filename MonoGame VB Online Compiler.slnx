@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MonoGameVB.Wasm/MonoGameVB.Wasm.vbproj" />
+  <Project Path="webapp/webapp.csproj" />
+</Solution>

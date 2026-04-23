@@ -81,7 +81,7 @@
                     <h5>Game Assets</h5>
                 </div>
                 <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" asp-page-handler="CompileWithAssets">
+                    <form method="post" enctype="multipart/form-data" asp-page-handler="BuildContent">
                         <input type="hidden" asp-for="ProjectId" />
                         <input type="hidden" asp-for="UserId" />
                         <input type="hidden" asp-for="VbCode" id="hiddenVbCode" />
@@ -105,8 +105,8 @@
                         </div>
 
                         <div class="d-grid gap-2">
-                            <button type="submit" name="handler" value="CompileWithAssets" class="btn btn-success">
-                                <i class="bi bi-gear-fill"></i> Build Content & Run
+                            <button type="submit" name="handler" value="BuildContent" class="btn btn-success">
+                                <i class="bi bi-gear-fill"></i> Build Content
                             </button>
                             <button type="button" class="btn btn-outline-secondary" onclick="clearAssets()">
                                 <i class="bi bi-trash"></i> Clear Assets

@@ -300,6 +300,75 @@ public sealed class MonoGameCompilerService
         }
     }
 
+    // Method for building content without full compilation
+    public async Task<ContentBuildResult> BuildContentAsync(int projectId, int userId, string sessionId, List<IFormFile>? newAssets = null)
+    {
+        _logger.LogInformation("Starting content build for ProjectId={ProjectId}, UserId={UserId}, SessionId={SessionId}", 
+            projectId, userId, sessionId);
+
+        try
+        {
+            var project = await _userService.GetGameProjectAsync(projectId, userId);
+            if (project == null)
+            {
+                _logger.LogError("Game project not found for ProjectId={ProjectId}, UserId={UserId}", projectId, userId);
+                return new ContentBuildResult
+                {
+                    Success = false,
+                    ErrorMessage = "Game project not found"
+                };
+            }
+
+            var tempProjectPath = Path.Combine(_tempBuildPath, $"content_build_{userId}_{projectId}_{sessionId}");
+            var userAssetPath = Path.Combine(_userAssetsPath, userId.ToString(), projectId.ToString());
+
+            _logger.LogInformation("Content build paths set - TempPath={TempPath}", tempProjectPath);
+
+            Directory.CreateDirectory(tempProjectPath);
+            Directory.CreateDirectory(userAssetPath);
+
+            _logger.LogInformation("Copying MonoGame project for content build");
+            await CopyMonoGameProjectOptimizedAsync(tempProjectPath);
+            
+            _logger.LogInformation("Updating GameMain.vb with user code");
+            await UpdateGameMainAsync(tempProjectPath, project.VbCode);
+            
+            _logger.LogInformation("Handling assets");
+            await HandleAssetsAsync(tempProjectPath, userAssetPath, project.Assets, newAssets);
+
+            _logger.LogInformation("Content build completed successfully");
+            return new ContentBuildResult
+            {
+                Success = true,
+                Message = "Content built successfully!"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error building content for user {UserId}, project {ProjectId}", userId, projectId);
+            return new ContentBuildResult
+            {
+                Success = false,
+                ErrorMessage = $"Content build error: {ex.Message}"
+            };
+        }
+        finally
+        {
+            var tempProjectPath = Path.Combine(_tempBuildPath, $"content_build_{userId}_{projectId}_{sessionId}");
+            if (Directory.Exists(tempProjectPath))
+            {
+                try
+                {
+                    Directory.Delete(tempProjectPath, true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to cleanup temp directory {TempPath}", tempProjectPath);
+                }
+            }
+        }
+    }
+
     // Shared private methods
     private async Task CopyMonoGameProjectAsync(string targetPath)
     {

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using webapp.Services;
+using webapp.Models;
 
 namespace webapp.Controllers;
 
@@ -90,53 +91,39 @@ public class MonoGameController(MonoGameCompilerService compilerService, ILogger
         }
     }
 
-    // File-based compilation endpoints (from both controllers)
-    [HttpPost("compile-with-assets")]
-    public async Task<ActionResult<CompilationResult>> CompileGameWithAssets([FromForm] CompileWithAssetsRequest request)
+    [HttpPost("build-content")]
+    public async Task<ActionResult<ContentBuildResult>> BuildContent([FromForm] CompileWithAssetsRequest request)
     {
-        if (request.VbCodeFile == null || request.VbCodeFile.Length == 0)
+        try
         {
-            return BadRequest("VB.NET code file is required");
+            if (request.ProjectId <= 0 || request.UserId <= 0)
+            {
+                return BadRequest("Valid project ID and user ID are required");
+            }
+
+            var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
+            var newAssets = Request.Form.Files.ToList();
+
+            var result = await compilerService.BuildContentAsync(request.ProjectId, request.UserId, sessionId, newAssets);
+
+            if (result.Success)
+            {
+                return Ok(result);
+            }
+            else
+            {
+                return BadRequest(result);
+            }
         }
-
-        using var reader = new StreamReader(request.VbCodeFile.OpenReadStream());
-        var vbCode = await reader.ReadToEndAsync();
-
-        var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
-        var assets = Request.Form.Files.Where(f => f != request.VbCodeFile).ToList();
-
-        var result = await compilerService.CompileGameAsync(vbCode, sessionId, assets);
-
-        if (result.Success)
+        catch (JsonException jsonEx)
         {
-            return Ok(result);
+            logger.LogError(jsonEx, "JSON parsing error in BuildContent endpoint");
+            return BadRequest($"Invalid JSON format: {jsonEx.Message}");
         }
-        else
+        catch (Exception ex)
         {
-            return BadRequest(result);
-        }
-    }
-
-    [HttpPost("compile-enhanced-with-assets")]
-    public async Task<ActionResult<CompilationResult>> CompileGameEnhancedWithAssets([FromForm] CompileWithAssetsRequest request)
-    {
-        if (request.ProjectId <= 0 || request.UserId <= 0)
-        {
-            return BadRequest("Valid project ID and user ID are required");
-        }
-
-        var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
-        var newAssets = Request.Form.Files.ToList();
-
-        var result = await compilerService.CompileGameAsync(request.ProjectId, request.UserId, sessionId, newAssets);
-
-        if (result.Success)
-        {
-            return Ok(result);
-        }
-        else
-        {
-            return BadRequest(result);
+            logger.LogError(ex, "Unexpected error in BuildContent endpoint");
+            return StatusCode(500, $"Internal server error: {ex.Message}");
         }
     }
 

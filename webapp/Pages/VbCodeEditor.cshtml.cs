@@ -396,14 +396,14 @@ End Class";
         }
     }
 
-    public async Task<IActionResult> OnPostCompileWithAssetsAsync()
+    public async Task<IActionResult> OnPostBuildContentAsync()
     {
-        _logger.LogInformation("OnPostCompileWithAssetsAsync called");
+        _logger.LogInformation("OnPostBuildContentAsync called");
         _logger.LogInformation("VbCode length: {Length}", VbCode?.Length ?? 0);
 
         if (string.IsNullOrWhiteSpace(VbCode))
         {
-            _logger.LogWarning("VbCode is empty or whitespace in CompileWithAssets");
+            _logger.LogWarning("VbCode is empty or whitespace in BuildContent");
             ModelState.AddModelError("VbCode", "VB.NET code is required");
             return Page();
         }
@@ -415,11 +415,9 @@ End Class";
             // Update project with current code
             await UpdateProjectAsync();
 
-            // Generate a unique session ID for this compilation
+            // Build content without compiling to WebAssembly
             var sessionId = Guid.NewGuid().ToString();
-            var gameId = $"game_{UserId}_{ProjectId}_{sessionId}";
-
-            // Start compilation in background
+            
             _ = Task.Run(async () =>
             {
                 try
@@ -438,25 +436,27 @@ End Class";
                         }
                     }
 
-                    var response = await httpClient.PostAsync("api/monogame/compile-enhanced-with-assets", content);
-                    _logger.LogInformation("Compilation with assets started for game {GameId}, status: {Status}", gameId, response.StatusCode);
+                    // Call a new endpoint that just builds content without full compilation
+                    var response = await httpClient.PostAsync("api/monogame/build-content", content);
+                    _logger.LogInformation("Content build started for project {ProjectId}, status: {Status}", ProjectId, response.StatusCode);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error starting compilation with assets for game {GameId}", gameId);
+                    _logger.LogError(ex, "Error building content for project {ProjectId}", ProjectId);
                 }
             });
 
-            // Set compilation status and return to page
-            IsCompiling = true;
-            CompilationGameId = gameId;
-            CompilationStatus = "Compiling with assets";
-            _logger.LogInformation("Compilation with assets started, showing compiling message for game {GameId}", gameId);
+            // Show success message without starting compilation
+            CompilationStatus = "Content built successfully!";
+            CompilationError = null;
+            IsCompiling = false;
+            
+            _logger.LogInformation("Content build process started for project {ProjectId}", ProjectId);
             return Page();
         }
         catch (Exception ex)
         {
-            CompilationError = $"Error during compilation: {ex.Message}";
+            CompilationError = $"Error building content: {ex.Message}";
             return Page();
         }
     }

@@ -9,8 +9,7 @@ Public Module SpriteBatchExtensions
         Return tex
     End Function
 
-    <Extension>
-    Public Sub DrawCircle(spriteBatch As SpriteBatch,
+    <Extension> Public Sub DrawCircle(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, center As Vector2, radius As Integer, color As Color,
             Optional thickness As Integer = 1)
         If radius < 1 Then Throw New ArgumentException("Radius must be at least 1.")
@@ -32,8 +31,7 @@ Public Module SpriteBatchExtensions
         End Using
     End Sub
 
-    <Extension>
-    Public Sub FillCircle(spriteBatch As SpriteBatch,
+    <Extension> Public Sub FillCircle(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, center As Vector2, radius As Integer, color As Color)
         If radius < 1 Then Throw New ArgumentException("Radius must be at least 1.")
 
@@ -50,8 +48,7 @@ Public Module SpriteBatchExtensions
         End Using
     End Sub
 
-    <Extension>
-    Public Sub DrawLine(spriteBatch As SpriteBatch,
+    <Extension> Public Sub DrawLine(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, start As Vector2, [end] As Vector2, color As Color,
             Optional thickness As Integer = 1)
         If thickness < 0 Then Throw New ArgumentException("Thickness must be at least 1.")
@@ -73,8 +70,7 @@ Public Module SpriteBatchExtensions
         End Using
     End Sub
 
-    <Extension>
-    Public Sub DrawTriangle(spriteBatch As SpriteBatch,
+    <Extension> Public Sub DrawTriangle(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, point1 As Vector2, point2 As Vector2, point3 As Vector2,
             color As Color, Optional thickness As Integer = 1)
         If thickness < 0 Then Throw New ArgumentException("Thickness must be at least 1.")
@@ -87,8 +83,7 @@ Public Module SpriteBatchExtensions
         End Using
     End Sub
 
-    <Extension>
-    Public Sub FillTriangle(spriteBatch As SpriteBatch,
+    <Extension> Public Sub FillTriangle(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, point1 As Vector2, point2 As Vector2, point3 As Vector2, color As Color)
         Dim IsPointInTriangle = Function(p As Vector2, p0 As Vector2, p1 As Vector2, p2 As Vector2) As Boolean
                                     Dim dX = p.X - p2.X
@@ -123,8 +118,7 @@ Public Module SpriteBatchExtensions
         End Using
     End Sub
 
-    <Extension>
-    Public Sub DrawRectangle(spriteBatch As SpriteBatch,
+    <Extension> Public Sub DrawRectangle(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, rect As Rectangle, thickness As Integer, color As Color)
         Using pixel = CreatePixelTexture(gfx, color)
             With spriteBatch
@@ -136,16 +130,14 @@ Public Module SpriteBatchExtensions
         End Using
     End Sub
 
-    <Extension>
-    Public Sub FillRectangle(spriteBatch As SpriteBatch,
+    <Extension> Public Sub FillRectangle(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, rect As Rectangle, color As Color)
         Using pixel = CreatePixelTexture(gfx, color)
             spriteBatch.Draw(pixel, rect, color)
         End Using
     End Sub
 
-    <Extension>
-    Public Sub DrawPolygon(spriteBatch As SpriteBatch,
+    <Extension> Public Sub DrawPolygon(spriteBatch As SpriteBatch,
             gfx As GraphicsDevice, points As Vector2(), color As Color, Optional thickness As Integer = 1)
         If points.Length < 2 Then Throw New ArgumentException("At least 2 points are required.")
 

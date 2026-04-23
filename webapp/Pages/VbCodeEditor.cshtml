@@ -35,32 +35,35 @@
                         @if (Model.IsCompiling)
                         {
                             <div class="alert alert-info" id="compilingAlert">
-                                <div class="d-flex align-items-center mb-2">
+                                <div class="d-flex align-items-center">
                                     <div class="spinner-border spinner-border-sm me-2" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
                                     <div>
-                                        <strong id="compilationStatus">Compiling, please wait...</strong>
+                                        <strong id="compilationStatus">Compiling game code, please wait...</strong>
                                     </div>
                                 </div>
-                                <div class="progress mb-2" style="height: 20px;">
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                         role="progressbar" 
-                                         style="width: 0%" 
-                                         id="compilationProgress"
-                                         aria-valuenow="0" 
-                                         aria-valuemin="0" 
-                                         aria-valuemax="100">0%</div>
-                                </div>
-                                <p class="mb-0 small text-muted" id="compilationDetails">
-                                    @Model.CompilationStatus - This may take 15-20 seconds. You will be redirected automatically when compilation is complete.
+                                <p class="mb-0 small text-muted mt-2" id="compilationDetails">
+                                    @Model.CompilationStatus - Compilation may take 15-20 seconds. You will be redirected automatically when complete.
                                 </p>
                             </div>
                         }
 
                         <div class="d-flex gap-2">
-                            <button id="compileButton" type="submit" name="handler" value="@((Model.IsCompiling) ? "Abort" : "Compile")" class="btn @((Model.IsCompiling) ? "btn-danger" : "btn-primary")" onclick="@((!Model.IsCompiling) ? "return validateAndSubmit()" : "")">
-                                <i id="compileButtonIcon" class="bi @((Model.IsCompiling) ? "bi-x-lg" : "bi-play-fill")"></i> <span id="compileButtonText">@((Model.IsCompiling) ? "Abort" : "Compile & Run")</span>
+                            @if (Model.IsCompiling)
+                            {
+                                <button id="abortButton" type="submit" name="handler" value="Abort" class="btn btn-danger">
+                                    <i class="bi bi-x-lg"></i> Abort
+                                </button>
+                            }
+                            else
+                            {
+                                <button id="compileButton" type="submit" name="handler" value="Compile" class="btn btn-primary">
+                                    <i class="bi bi-play-fill"></i> Compile & Run
+                                </button>
+                            }
+                            <button type="button" class="btn btn-success" onclick="saveProject()">
+                                <i class="bi bi-save-fill"></i> Save Project
                             </button>
                             <button type="button" class="btn btn-secondary" onclick="resetCode()">
                                 <i class="bi bi-arrow-counterclockwise"></i> Reset to Scaffold
@@ -195,11 +198,13 @@
         }
 
         function validateAndSubmit() {
+            console.log('validateAndSubmit called');
             const codeValue = editor.getValue();
-            console.log('validateAndSubmit called, code length:', codeValue?.length || 0);
+            console.log('Code length:', codeValue?.length || 0);
             
             if (!codeValue || codeValue.trim() === '') {
                 alert('Please enter some VB.NET code before compiling.');
+                console.log('Validation failed: Empty code');
                 return false;
             }
             
@@ -217,28 +222,48 @@
             return true;
         }
 
-        // Add form submit handler to ensure code is always set
+        // Add form submit handler to ensure code is always set and validated
         document.addEventListener('DOMContentLoaded', function() {
             const compileForm = document.getElementById('compileForm');
             if (compileForm) {
                 compileForm.addEventListener('submit', function(e) {
+                    console.log('Form submit event triggered');
+                    
+                    // Validate before submission
                     const codeValue = editor.getValue();
+                    if (!codeValue || codeValue.trim() === '') {
+                        e.preventDefault();
+                        alert('Please enter some VB.NET code before compiling.');
+                        console.log('Validation failed: Empty code');
+                        return;
+                    }
+                    
+                    // Set the hidden field value
                     const vbCodeHidden = document.getElementById('vbCodeHidden');
                     if (vbCodeHidden) {
                         vbCodeHidden.value = codeValue;
                         console.log('Form submit: Set vbCodeHidden value, length:', vbCodeHidden.value.length);
                     }
+                    
+                    console.log('Form validation passed, submitting...');
+                    // Don't prevent default - let the form submit normally
                 });
             }
         });
 
-        document.querySelector('form[enctype="multipart/form-data"]').addEventListener('submit', function (e) {
-            const codeValue = editor.getValue();
-            const hiddenVbCode = document.getElementById('hiddenVbCode');
-            if (hiddenVbCode) {
-                hiddenVbCode.value = codeValue;
-            }
-        });
+        // Handle asset form submission separately
+        const assetForm = document.querySelector('form[enctype="multipart/form-data"]');
+        if (assetForm) {
+            assetForm.addEventListener('submit', function (e) {
+                console.log('Asset form submit event triggered');
+                const codeValue = editor.getValue();
+                const hiddenVbCode = document.getElementById('hiddenVbCode');
+                if (hiddenVbCode) {
+                    hiddenVbCode.value = codeValue;
+                    console.log('Asset form: Set hiddenVbCode value, length:', hiddenVbCode.value.length);
+                }
+            });
+        }
 
         document.getElementById('assetFiles').addEventListener('change', function () {
             const files = Array.from(this.files);
@@ -291,6 +316,40 @@
             }
         }
 
+        async function saveProject() {
+            const codeValue = editor.getValue();
+            const projectId = document.getElementById('ProjectId').value;
+            const userId = document.getElementById('UserId').value;
+            
+            if (!codeValue || codeValue.trim() === '') {
+                alert('Please enter some VB.NET code before saving.');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/project/${projectId}?userId=${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: parseInt(userId),
+                        name: '@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ProjectName))',
+                        vbCode: codeValue
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Project saved successfully!');
+                } else {
+                    const error = await response.json();
+                    alert('Failed to save project: ' + (error.Message || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error saving project: ' + error.message);
+            }
+        }
+
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -301,12 +360,9 @@
 
         // Check compilation status if a compilation is in progress
         let compilationCheckInterval;
-        let compilationStartTime;
-        let compilationTimeout;
-        let currentPollingInterval = 3000; // Start with 3 seconds
-        const maxPollingInterval = 15000; // Max 15 seconds
-        const expectedCompilationTime = 30000; // 30 seconds expected time
-        const maxCompilationTime = 180000; // 3 minutes maximum wait time
+        const pollingInterval = 3000; // Check every 3 seconds
+        const maxPollingTime = 180000; // Maximum 3 minutes polling time
+        let pollingStartTime;
         
         document.addEventListener('DOMContentLoaded', function() {
             const gameId = '@Model.CompilationGameId';
@@ -323,73 +379,23 @@
             }
             
             if (isCompiling === 'true' && gameId) {
-                compilationStartTime = Date.now();
-                compilationTimeout = setTimeout(handleCompilationTimeout, maxCompilationTime);
-                updateCompilationProgress();
-                
-                // Start with initial polling interval
+                pollingStartTime = Date.now();
                 checkCompilationStatus();
             }
         });
         
-        function scheduleNextStatusCheck() {
-            // Exponential backoff - double the interval each time, up to max
-            currentPollingInterval = Math.min(currentPollingInterval * 1.5, maxPollingInterval);
-            compilationCheckInterval = setTimeout(checkCompilationStatus, currentPollingInterval);
-            console.log(`Scheduling next status check in ${currentPollingInterval}ms`);
-        }
-
-        function handleCompilationTimeout() {
-            clearInterval(compilationCheckInterval);
-            
-            const progressBar = document.getElementById('compilationProgress');
-            const statusText = document.getElementById('compilationStatus');
-            
-            if (progressBar) {
-                progressBar.style.width = '100%';
-                progressBar.textContent = '100%';
-                progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-                progressBar.classList.add('bg-danger');
-            }
-            
-            if (statusText) {
-                statusText.textContent = 'Compilation timeout!';
-            }
-            
-            alert('Compilation is taking longer than expected. Please check the logs or try again.');
-        }
-
-        function updateCompilationProgress() {
-            const elapsed = Date.now() - compilationStartTime;
-            const progress = Math.min((elapsed / expectedCompilationTime) * 100, 95);
-            
-            const progressBar = document.getElementById('compilationProgress');
-            const statusText = document.getElementById('compilationStatus');
-            
-            if (progressBar && statusText) {
-                progressBar.style.width = progress + '%';
-                progressBar.setAttribute('aria-valuenow', progress);
-                progressBar.textContent = Math.round(progress) + '%';
-                
-                if (progress < 20) {
-                    statusText.textContent = 'Initializing build...';
-                } else if (progress < 40) {
-                    statusText.textContent = 'Compiling VB.NET code...';
-                } else if (progress < 60) {
-                    statusText.textContent = 'Building WebAssembly...';
-                } else if (progress < 80) {
-                    statusText.textContent = 'Optimizing assets...';
-                } else {
-                    statusText.textContent = 'Finalizing...';
-                }
-            }
-        }
-
         async function checkCompilationStatus() {
             const gameId = '@Model.CompilationGameId';
-            const parts = gameId.split('_');
+            const elapsed = Date.now() - pollingStartTime;
             
-            updateCompilationProgress();
+            // Stop polling after maximum time
+            if (elapsed > maxPollingTime) {
+                console.log('Maximum polling time reached, stopping');
+                clearInterval(compilationCheckInterval);
+                return;
+            }
+            
+            const parts = gameId.split('_');
             
             if (parts.length >= 4) {
                 const sessionId = parts.slice(3).join('_');
@@ -403,23 +409,9 @@
                         console.log('Compilation session status:', session);
                         
                         if (session.completedAt) {
-                            clearTimeout(compilationTimeout);
-                            clearTimeout(compilationCheckInterval);
+                            clearInterval(compilationCheckInterval);
                             
-                            const progressBar = document.getElementById('compilationProgress');
                             const statusText = document.getElementById('compilationStatus');
-                            
-                            if (progressBar) {
-                                progressBar.style.width = '100%';
-                                progressBar.textContent = '100%';
-                                progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-                                
-                                if (session.success) {
-                                    progressBar.classList.add('bg-success');
-                                } else {
-                                    progressBar.classList.add('bg-danger');
-                                }
-                            }
                             
                             if (statusText) {
                                 statusText.textContent = session.success ? 'Compilation complete!' : 'Compilation failed!';
@@ -435,8 +427,8 @@
                                 }, 2000);
                             }
                         } else {
-                            // Compilation still in progress, schedule next check with exponential backoff
-                            scheduleNextStatusCheck();
+                            // Compilation still in progress, continue polling
+                            compilationCheckInterval = setTimeout(checkCompilationStatus, pollingInterval);
                         }
                     } else if (response.status === 404) {
                         console.log('Session not found, checking game status...');
@@ -445,44 +437,23 @@
                             const statusResult = await statusResponse.json();
                             console.log('Game status:', statusResult);
                             
-                            // Check if compilation was successful based on the actual response structure
+                            // Check if compilation was successful
                             if (statusResult.success === true || statusResult.Success === true) {
-                                clearTimeout(compilationTimeout);
-                                clearTimeout(compilationCheckInterval);
+                                clearInterval(compilationCheckInterval);
                                 
-                                const progressBar = document.getElementById('compilationProgress');
                                 const statusText = document.getElementById('compilationStatus');
-                                
-                                if (progressBar) {
-                                    progressBar.style.width = '100%';
-                                    progressBar.textContent = '100%';
-                                    progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-                                    progressBar.classList.add('bg-success');
-                                }
-                                
                                 if (statusText) {
                                     statusText.textContent = 'Compilation complete!';
                                 }
                                 
-                                // Use the gameId from the response or fall back to the current gameId
                                 const gameIdToUse = statusResult.gameId || statusResult.GameId || gameId;
                                 setTimeout(() => {
                                     window.location.href = '/GameRunner?gameId=' + gameIdToUse;
                                 }, 500);
                             } else if (statusResult.success === false || statusResult.Success === false || statusResult.Status === 'NotFound') {
-                                clearTimeout(compilationTimeout);
-                                clearTimeout(compilationCheckInterval);
+                                clearInterval(compilationCheckInterval);
                                 
-                                const progressBar = document.getElementById('compilationProgress');
                                 const statusText = document.getElementById('compilationStatus');
-                                
-                                if (progressBar) {
-                                    progressBar.style.width = '100%';
-                                    progressBar.textContent = '100%';
-                                    progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
-                                    progressBar.classList.add('bg-danger');
-                                }
-                                
                                 if (statusText) {
                                     statusText.textContent = 'Compilation failed!';
                                 }
@@ -491,22 +462,22 @@
                                     window.location.reload();
                                 }, 2000);
                             } else {
-                                // Status not determined, schedule next check
-                                scheduleNextStatusCheck();
+                                // Status not determined, continue polling
+                                compilationCheckInterval = setTimeout(checkCompilationStatus, pollingInterval);
                             }
                         } else {
-                            // Status check failed, schedule next check
-                            scheduleNextStatusCheck();
+                            // Status check failed, continue polling
+                            compilationCheckInterval = setTimeout(checkCompilationStatus, pollingInterval);
                         }
                     } else {
                         console.error('Failed to check compilation session status:', response.status, response.statusText);
-                        // Schedule next check even if there's an error
-                        scheduleNextStatusCheck();
+                        // Continue polling even if there's an error
+                        compilationCheckInterval = setTimeout(checkCompilationStatus, pollingInterval);
                     }
                 } catch (error) {
                     console.error('Error checking compilation status:', error);
-                    // Schedule next check even if there's an error
-                    scheduleNextStatusCheck();
+                    // Continue polling even if there's an error
+                    compilationCheckInterval = setTimeout(checkCompilationStatus, pollingInterval);
                 }
             }
         }
